@@ -1,0 +1,38 @@
+---
+name: docker_cpi
+
+templates:
+  cpi.erb: bin/cpi
+  cpi_ctl.erb: bin/cpi_ctl
+  cpi.json.erb: config/cpi.json
+
+packages:
+- docker_cpi
+
+properties:
+  docker_cpi.host_ip:
+    description: "IP address of the host that will be used by containers, must be the same as mbus IP"
+    example: "10.254.50.4"
+
+  docker_cpi.docker.host:
+    description: "Docker host will use to connect (tcp or unix)"
+    example: "tcp://10.10.0.62:32768"
+  docker_cpi.docker.api_version:
+    description: "Expected Docker API version"
+    default: "1.22"
+  docker_cpi.docker.tls:
+    type: certificate
+    description: "Certificate for connection"
+
+  docker_cpi.agent.mbus:
+    description: "Mbus URL used by deployed BOSH agents"
+    example: "nats://nats:nats-password@10.254.50.4:4222"
+  docker_cpi.agent.ntp:
+    description: "NTP configuration used by deployed BOSH agents"
+    default: []
+  docker_cpi.agent.blobstore.provider:
+    description: "Provider type for the blobstore used by deployed BOSH agents (e.g. dav, s3)"
+    default: "dav"
+  docker_cpi.agent.blobstore.options:
+    description: "Options for the blobstore used by deployed BOSH agents"
+    default: {}

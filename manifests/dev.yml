@@ -1,0 +1,6 @@
+- type: replace
+  path: /releases/name=bosh-docker-cpi/url
+  value: file://((docker_cpi_path))
+
+- type: remove
+  path: /releases/name=bosh-docker-cpi/sha1

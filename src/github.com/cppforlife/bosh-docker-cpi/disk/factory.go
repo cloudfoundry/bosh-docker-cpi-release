@@ -1,0 +1,97 @@
+package disk
+
+import (
+	"context"
+	"encoding/json"
+
+	bosherr "github.com/cloudfoundry/bosh-utils/errors"
+	boshlog "github.com/cloudfoundry/bosh-utils/logger"
+	boshuuid "github.com/cloudfoundry/bosh-utils/uuid"
+	"github.com/cppforlife/bosh-cpi-go/apiv1"
+	dkrclient "github.com/docker/engine-api/client"
+	dkrtypes "github.com/docker/engine-api/types"
+)
+
+type Factory struct {
+	dkrClient *dkrclient.Client
+	uuidGen   boshuuid.Generator
+
+	logTag string
+	logger boshlog.Logger
+}
+
+func NewFactory(
+	dkrClient *dkrclient.Client,
+	uuidGen boshuuid.Generator,
+	logger boshlog.Logger,
+) Factory {
+	return Factory{
+		dkrClient: dkrClient,
+		uuidGen:   uuidGen,
+
+		logTag: "disk.Factory",
+		logger: logger,
+	}
+}
+
+func (f Factory) Create(size int, vmCID *apiv1.VMCID) (Disk, error) {
+	f.logger.Debug(f.logTag, "Creating disk of size '%d'", size)
+
+	id, err := f.uuidGen.Generate()
+	if err != nil {
+		return nil, bosherr.WrapError(err, "Generating disk ID")
+	}
+
+	// todo allow other drivers
+	opts := dkrtypes.VolumeCreateRequest{
+		Name:   id,
+		Driver: "local",
+	}
+
+	if vmCID != nil {
+		node, err := f.possiblyFindNodeWithContainer(*vmCID)
+		if err != nil {
+			return nil, bosherr.WrapError(err, "Finding node for container")
+		}
+
+		if len(node) > 0 {
+			// Choose specific node for local disk creation
+			opts.Name = node + "/" + opts.Name
+		}
+	}
+
+	_, err = f.dkrClient.VolumeCreate(context.TODO(), opts)
+	if err != nil {
+		return nil, bosherr.WrapError(err, "Creating volume")
+	}
+
+	return NewVolume(apiv1.NewDiskCID(id), f.dkrClient, f.logger), nil
+}
+
+func (f Factory) Find(id apiv1.DiskCID) (Disk, error) {
+	return NewVolume(id, f.dkrClient, f.logger), nil
+}
+
+func (f Factory) possiblyFindNodeWithContainer(vmCID apiv1.VMCID) (string, error) {
+	_, rawResp, err := f.dkrClient.ContainerInspectWithRaw(context.TODO(), vmCID.AsString(), false)
+	if err != nil {
+		return "", bosherr.WrapError(err, "Inspecting container")
+	}
+
+	var resp containerResp
+
+	err = json.Unmarshal(rawResp, &resp)
+	if err != nil {
+		return "", bosherr.WrapError(err, "Unmarshalling raw container resp")
+	}
+
+	return resp.Node.Name, nil
+}
+
+type containerResp struct {
+	Node nodeResp
+}
+
+type nodeResp struct {
+	Name string
+}

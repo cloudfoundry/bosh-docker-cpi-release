@@ -1,0 +1,6 @@
+---
+- type: replace
+  path: /releases/name=bosh-docker-cpi
+  value:
+    name: bosh-docker-cpi
+    url: file://((local_cpi_release))

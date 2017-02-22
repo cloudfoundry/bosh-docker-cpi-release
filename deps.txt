@@ -1,0 +1,11 @@
+f6c3861 github.com/cloudfoundry/bosh-utils/.git
+f44a913 github.com/cppforlife/bosh-cpi-go/.git
+df5327f github.com/docker/distribution/.git
+4290f40 github.com/docker/engine-api/.git
+7da10c8 github.com/docker/go-connections/.git
+0dadbb0 github.com/docker/go-units/.git
+bb93381 github.com/onsi/ginkgo/.git
+c463cd2 github.com/onsi/gomega/.git
+7f4b1ad github.com/Sirupsen/logrus/.git
+6b27048 golang.org/x/net/.git
+a3f3340 gopkg.in/yaml.v2/.git

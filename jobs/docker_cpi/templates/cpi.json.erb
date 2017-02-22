@@ -1,0 +1,23 @@
+<%=
+
+JSON.dump(
+  "Actions" => {
+    "Docker" => {
+      "Host"       => p("docker_cpi.docker.host"),
+      "CACert"     => p("docker_cpi.docker.tls.ca"),
+      "APIVersion" => p("docker_cpi.docker.api_version"),
+    },
+
+    "Agent" => {
+      "Mbus" => p("docker_cpi.agent.mbus"),
+      "NTP"  => p("docker_cpi.agent.ntp"),
+
+      "Blobstore" => {
+        "Provider" => p("docker_cpi.agent.blobstore.provider"),
+        "Options"  => p("docker_cpi.agent.blobstore.options"),
+      },
+    },
+  }
+)
+
+%>

@@ -1,0 +1,5 @@
+check process docker_cpi
+  with pidfile /var/vcap/sys/run/docker_cpi/cpi.pid
+  start program "/var/vcap/jobs/docker_cpi/bin/cpi_ctl start"
+  stop program "/var/vcap/jobs/docker_cpi/bin/cpi_ctl stop"
+  group vcap
