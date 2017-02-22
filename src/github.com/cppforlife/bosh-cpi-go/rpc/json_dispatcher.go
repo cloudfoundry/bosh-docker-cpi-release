@@ -1,6 +1,7 @@
 package rpc
 
 import (
+  "fmt"
 	"encoding/json"
 
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
@@ -66,7 +67,7 @@ func (c JSONDispatcher) Dispatch(reqBytes []byte) []byte {
 
 	action, err := c.actionFactory.Create(req.Method, req.Context)
 	if err != nil {
-		return c.notImplementedError()
+		return c.notImplementedError(err)
 	}
 
 	result, err := c.caller.Call(action, req.Arguments)
@@ -135,11 +136,11 @@ func (c JSONDispatcher) cpiError(message string) []byte {
 	return respErrBytes
 }
 
-func (c JSONDispatcher) notImplementedError() []byte {
+func (c JSONDispatcher) notImplementedError(err error) []byte {
 	respErr := Response{
 		Error: &ResponseError{
 			Type:    "Bosh::Clouds::NotImplemented",
-			Message: "Must call implemented method",
+			Message: fmt.Sprintf("Must call implemented method: %s", err),
 		},
 	}
 
