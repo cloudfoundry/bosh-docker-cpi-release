@@ -14,6 +14,8 @@ type DockerOpts struct {
 	Host       string
 	CACert     string
 	APIVersion string
+	CertFile   string
+	KeyFile    string
 }
 
 func (o FactoryOpts) Validate() error {
