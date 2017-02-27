@@ -1,0 +1,25 @@
+name: bosh-docker-cpi
+version: 0.0.2
+commit_hash: 3c3f59e
+uncommitted_changes: false
+jobs:
+- name: docker_cpi
+  version: f5ed2dab19be8959dcfeeb2c18fb97a525de1b80
+  fingerprint: f5ed2dab19be8959dcfeeb2c18fb97a525de1b80
+  sha1: e036cf95a066f7b5fe9b8ae49a9d4f934ad6c4b0
+packages:
+- name: docker_cpi
+  version: f4601b570c7eafab4d3cf41267a55d8b505f1159
+  fingerprint: f4601b570c7eafab4d3cf41267a55d8b505f1159
+  sha1: 893aae87618619c9af18659c058d0e48d5bf25d0
+  dependencies:
+  - golang_1.7
+- name: golang_1.7
+  version: 21609f611781e8586e713cfd7ceb389cee429c5a
+  fingerprint: 21609f611781e8586e713cfd7ceb389cee429c5a
+  sha1: 319b3fc1e512e00fb6f3951bf2a0dfcd8038fd1d
+  dependencies: []
+license:
+  version: 082c92c0c3edb0db49b9b4e15c54c164a63134de
+  fingerprint: 082c92c0c3edb0db49b9b4e15c54c164a63134de
+  sha1: 099154065fa215f31f3fa13c432d64afa1858804
