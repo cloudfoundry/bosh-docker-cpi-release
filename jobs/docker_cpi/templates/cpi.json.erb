@@ -5,6 +5,8 @@ JSON.dump(
     "Docker" => {
       "Host"       => p("docker_cpi.docker.host"),
       "CACert"     => p("docker_cpi.docker.tls.ca"),
+      "CertFile"     => p("docker_cpi.docker.tls.certificate", ""),
+      "KeyFile"     => p("docker_cpi.docker.tls.private_key", ""),
       "APIVersion" => p("docker_cpi.docker.api_version"),
     },
 
