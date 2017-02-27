@@ -12,10 +12,11 @@ type FactoryOpts struct {
 
 type DockerOpts struct {
 	Host       string
-	CACert     string
 	APIVersion string
-	CertFile   string
-	KeyFile    string
+
+	CACert     string
+	Cert       string
+	PrivateKey string
 }
 
 func (o FactoryOpts) Validate() error {
@@ -43,6 +44,14 @@ func (o DockerOpts) Validate() error {
 
 	if len(o.CACert) == 0 {
 		return bosherr.Error("Must provide non-empty CACert")
+	}
+
+	if len(o.Cert) == 0 {
+		return bosherr.Error("Must provide non-empty Cert")
+	}
+
+	if len(o.PrivateKey) == 0 {
+		return bosherr.Error("Must provide non-empty PrivateKey")
 	}
 
 	return nil

@@ -1,6 +1,7 @@
 package cpi
 
 import (
+	"crypto/tls"
 	"net/http"
 
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
@@ -14,8 +15,6 @@ import (
 	bdisk "github.com/cppforlife/bosh-docker-cpi/disk"
 	bstem "github.com/cppforlife/bosh-docker-cpi/stemcell"
 	bvm "github.com/cppforlife/bosh-docker-cpi/vm"
-	"crypto/tls"
-	"fmt"
 )
 
 type Factory struct {
@@ -108,13 +107,12 @@ func (f Factory) httpClient() (*http.Client, error) {
 	tlsConfig.InsecureSkipVerify = false
 	tlsConfig.RootCAs = certPool
 
-	if f.opts.Docker.CertFile != "" || f.opts.Docker.KeyFile != "" {
-		tlsCert, err := tls.X509KeyPair([]byte(f.opts.Docker.CertFile), []byte(f.opts.Docker.KeyFile))
-		if err != nil {
-			return nil, fmt.Errorf("Could not load X509 key pair: %v. Make sure the key is not encrypted", err)
-		}
-		tlsConfig.Certificates = []tls.Certificate{tlsCert}
+	tlsCert, err := tls.X509KeyPair([]byte(f.opts.Docker.Cert), []byte(f.opts.Docker.PrivateKey))
+	if err != nil {
+		return nil, bosherr.WrapError(err, "Loading X509 key pair (make sure the key is not encrypted)")
 	}
+
+	tlsConfig.Certificates = []tls.Certificate{tlsCert}
 
 	client := &http.Client{
 		Transport: &http.Transport{

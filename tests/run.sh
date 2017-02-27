@@ -22,7 +22,7 @@ bosh create-env ~/workspace/bosh-deployment/bosh.yml \
   -v internal_gw=10.245.0.1 \
   -v internal_ip=10.245.0.11 \
   -v docker_host=tcp://192.168.50.8:4243 \
-  -v docker_tls="{\"ca\": \"$(cat ~/.docker/ca.pem2)\"}" \
+  -l docker-creds.yml \
   -v network=net3
 
 export BOSH_ENVIRONMENT=10.245.0.11
@@ -53,7 +53,7 @@ bosh create-env ~/workspace/bosh-deployment/bosh.yml \
   -v internal_gw=10.245.0.1 \
   -v internal_ip=10.245.0.11 \
   -v docker_host=tcp://192.168.50.8:4243 \
-  -v docker_tls="{\"ca\": \"$(cat ~/.docker/ca.pem2)\"}" \
+  -l docker-creds.yml \
   -v network=net3 \
   -v force_val="`date`"
 
@@ -100,7 +100,7 @@ bosh delete-env ~/workspace/bosh-deployment/bosh.yml \
   -v internal_gw=10.245.0.1 \
   -v internal_ip=10.245.0.11 \
   -v docker_host=tcp://192.168.50.8:4243 \
-  -v docker_tls="{\"ca\": \"$(cat ~/.docker/ca.pem2)\"}" \
+  -l docker-creds.yml \
   -v network=net3
 
 echo "-----> `date`: Done"
