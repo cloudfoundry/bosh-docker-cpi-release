@@ -17,6 +17,7 @@ Known limitations:
 
 ## TODO
 
+- disk migration
 - root & ephemeral disk size limits
 - persistent disk attach after container is created
 - AZ tagging
