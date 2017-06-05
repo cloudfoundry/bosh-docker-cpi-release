@@ -50,16 +50,6 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	cloudProps apiv1.VMCloudProps, networks apiv1.Networks,
 	diskCIDs []apiv1.DiskCID, env apiv1.VMEnv) (VM, error) {
 
-	if len(networks) == 0 {
-		return Container{}, bosherr.Error("Expected exactly one network; received zero")
-	}
-
-	for _, net := range networks {
-		net.SetPreconfigured()
-	}
-
-	network := networks.Default()
-
 	var vmProps VMProps
 
 	err := cloudProps.As(&vmProps)
@@ -67,15 +57,9 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		return Container{}, bosherr.WrapError(err, "Unmarshaling VM properties")
 	}
 
-	var netProps NetProps
-
-	err = network.CloudProps().As(&netProps)
+	netProps, network, err := NewNetworks(f.dkrClient, f.uuidGen, networks).Enable()
 	if err != nil {
-		return Container{}, bosherr.WrapError(err, "Unmarshaling network properties")
-	}
-
-	if len(netProps.Name) == 0 {
-		return Container{}, bosherr.WrapError(err, "Expected network to specify 'name'")
+		return nil, bosherr.WrapError(err, "Enabling networks")
 	}
 
 	idStr, err := f.uuidGen.Generate()

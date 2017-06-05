@@ -13,5 +13,6 @@ type VMProps struct {
 }
 
 type NetProps struct {
-	Name string
+	Name   string
+	Driver string
 }
