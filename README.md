@@ -25,6 +25,7 @@ Known limitations:
 - drain of containers when host is going down
 - expose ports
 - network name vs cloud_properties
+- multiple networks
 - [cf] gorouter tcp tuning
   - running_in_container needs to check for docker
 - [cf] postgres needs /var/vcap/store
