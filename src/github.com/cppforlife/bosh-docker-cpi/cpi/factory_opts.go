@@ -1,6 +1,8 @@
 package cpi
 
 import (
+	"strings"
+
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
 	"github.com/cppforlife/bosh-cpi-go/apiv1"
 )
@@ -33,6 +35,10 @@ func (o FactoryOpts) Validate() error {
 	return nil
 }
 
+func (o DockerOpts) RequiresTLS() bool {
+	return !strings.HasPrefix(o.Host, "unix://")
+}
+
 func (o DockerOpts) Validate() error {
 	if o.Host == "" {
 		return bosherr.Error("Must provide non-empty Host")
@@ -42,16 +48,18 @@ func (o DockerOpts) Validate() error {
 		return bosherr.Error("Must provide non-empty APIVersion")
 	}
 
-	if len(o.CACert) == 0 {
-		return bosherr.Error("Must provide non-empty CACert")
-	}
+	if o.RequiresTLS() {
+		if len(o.CACert) == 0 {
+			return bosherr.Error("Must provide non-empty CACert")
+		}
 
-	if len(o.Cert) == 0 {
-		return bosherr.Error("Must provide non-empty Cert")
-	}
+		if len(o.Cert) == 0 {
+			return bosherr.Error("Must provide non-empty Cert")
+		}
 
-	if len(o.PrivateKey) == 0 {
-		return bosherr.Error("Must provide non-empty PrivateKey")
+		if len(o.PrivateKey) == 0 {
+			return bosherr.Error("Must provide non-empty PrivateKey")
+		}
 	}
 
 	return nil

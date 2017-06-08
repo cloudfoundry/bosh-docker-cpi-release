@@ -54,13 +54,19 @@ func NewFactory(
 }
 
 func (f Factory) New(_ apiv1.CallContext) (apiv1.CPI, error) {
+	var httpClient *http.Client
+
+	if f.opts.Docker.RequiresTLS() {
+		var err error
+
+		httpClient, err = f.httpClient()
+		if err != nil {
+			return CPI{}, err
+		}
+	}
+
 	host := f.opts.Docker.Host
 	version := f.opts.Docker.APIVersion
-
-	httpClient, err := f.httpClient()
-	if err != nil {
-		return CPI{}, err
-	}
 
 	dkrClient, err := dkrclient.NewClient(host, version, httpClient, nil)
 	if err != nil {

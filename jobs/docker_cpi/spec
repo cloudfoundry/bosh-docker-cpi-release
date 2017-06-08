@@ -22,7 +22,9 @@ properties:
     default: "1.22"
   docker_cpi.docker.tls:
     type: certificate
-    description: "Mutual TLS client certificate for connecting to Docker daemon"
+    description: |
+      Mutual TLS client certificate for connecting to Docker daemon.
+      Optional with unix:// host, otherwise required.
 
   docker_cpi.agent.mbus:
     description: "Mbus URL used by deployed BOSH agents"

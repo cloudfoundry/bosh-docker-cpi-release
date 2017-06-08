@@ -1,14 +1,10 @@
 <%=
 
-JSON.dump(
+config = {
   "Actions" => {
     "Docker" => {
       "Host"       => p("docker_cpi.docker.host"),
       "APIVersion" => p("docker_cpi.docker.api_version"),
-
-      "CACert"     => p("docker_cpi.docker.tls.ca"),
-      "Cert"       => p("docker_cpi.docker.tls.certificate"),
-      "PrivateKey" => p("docker_cpi.docker.tls.private_key"),
     },
 
     "Agent" => {
@@ -21,6 +17,16 @@ JSON.dump(
       },
     },
   }
-)
+}
+
+docker = config["Actions"]["Docker"]
+
+if !docker["Host"].start_with?("unix://")
+  docker["CACert"]     = p("docker_cpi.docker.tls.ca")
+  docker["Cert"]       = p("docker_cpi.docker.tls.certificate")
+  docker["PrivateKey"] = p("docker_cpi.docker.tls.private_key")
+end
+
+JSON.dump(config)
 
 %>

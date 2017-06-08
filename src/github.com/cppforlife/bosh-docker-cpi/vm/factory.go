@@ -125,6 +125,8 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		containerConfig.ExposedPorts[dkrnat.Port(port)] = struct{}{}
 	}
 
+	vmProps = f.cleanMounts(vmProps)
+
 	endPtConfig := &dkrnet.EndpointSettings{
 		IPAMConfig: &dkrnet.EndpointIPAMConfig{
 			IPv4Address: network.IP(),
@@ -211,4 +213,18 @@ func (f Factory) possiblyFindNodeWithDisk(diskID apiv1.DiskCID) (string, error) 
 
 	// Did not find volume on any nodes
 	return "", nil
+}
+
+func (f Factory) cleanMounts(vmProps VMProps) VMProps {
+	const unixSock = "unix://"
+
+	for i, _ := range vmProps.HostConfig.Mounts {
+		// Strip off unix socker from sources for convenience of configuration
+		if strings.HasPrefix(vmProps.HostConfig.Mounts[i].Source, unixSock) {
+			vmProps.HostConfig.Mounts[i].Source =
+				strings.TrimPrefix(vmProps.HostConfig.Mounts[i].Source, unixSock)
+		}
+	}
+
+	return vmProps
 }
