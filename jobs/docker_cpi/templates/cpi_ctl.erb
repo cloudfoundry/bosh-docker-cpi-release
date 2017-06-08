@@ -11,7 +11,9 @@ case $1 in
     chown -R vcap:vcap $RUN_DIR $LOG_DIR
 
     <% if_p('docker_cpi.host_ip') do |host_ip| %>
-    ifconfig lo:1 <%= host_ip %> netmask 255.255.255.0
+    if ! ip addr show dev lo | grep -q <%= host_ip %>; then
+      ip addr add <%= host_ip %> dev lo
+    fi
     <% end %>
 
     echo 1 > $PIDFILE
