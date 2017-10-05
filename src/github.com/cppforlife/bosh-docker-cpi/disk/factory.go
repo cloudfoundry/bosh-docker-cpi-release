@@ -42,6 +42,8 @@ func (f Factory) Create(size int, vmCID *apiv1.VMCID) (Disk, error) {
 		return nil, bosherr.WrapError(err, "Generating disk ID")
 	}
 
+	id = "vol-" + id
+
 	// todo allow other drivers
 	opts := dkrtypes.VolumeCreateRequest{
 		Name:   id,

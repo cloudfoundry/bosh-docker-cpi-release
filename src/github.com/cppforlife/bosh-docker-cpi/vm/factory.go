@@ -67,6 +67,8 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		return nil, bosherr.WrapError(err, "Generating container ID")
 	}
 
+	idStr = "c-" + idStr
+
 	id := apiv1.NewVMCID(idStr)
 
 	containerConfig := &dkrcont.Config{
@@ -122,6 +124,8 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			netProps.Name: endPtConfig,
 		},
 	}
+
+	vmProps.HostConfig.Binds = []string{EphemeralDiskCID{id}.AsString() + ":/var/vcap/data/"}
 
 	f.logger.Debug(f.logTag, "Creating container %#v, host %#v", containerConfig, &vmProps.HostConfig)
 

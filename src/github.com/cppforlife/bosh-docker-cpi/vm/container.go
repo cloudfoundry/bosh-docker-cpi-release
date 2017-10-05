@@ -26,6 +26,12 @@ type Container struct {
 	logger boshlog.Logger
 }
 
+type EphemeralDiskCID struct {
+	id apiv1.VMCID
+}
+
+func (c EphemeralDiskCID) AsString() string { return "vol-eph-" + c.id.AsString() }
+
 func NewContainer(
 	id apiv1.VMCID,
 	dkrClient *dkrclient.Client,
@@ -64,11 +70,16 @@ func (c Container) Delete() error {
 			// todo how to best handle rootfs removal e.g.:
 			// ... remove root filesystem xxx-removing: device or resource busy
 			// ... remove root filesystem xxx: layer not retained
-			if strings.Contains(err.Error(), "Driver aufs failed to remove root filesystem") {
-				return nil
+			if !strings.Contains(err.Error(), "Driver aufs failed to remove root filesystem") {
+				return err
 			}
+		}
+	}
 
-			return err
+	err = c.dkrClient.VolumeRemove(context.TODO(), EphemeralDiskCID{c.id}.AsString(), true)
+	if err != nil {
+		if !dkrclient.IsErrVolumeNotFound(err) {
+			return bosherr.WrapErrorf(err, "Deleting ephemeral volume")
 		}
 	}
 
@@ -192,11 +203,7 @@ func (c Container) restartByRecreating(diskID apiv1.DiskCID, diskPath string) er
 		conf.Config.Env = []string{"constraint:node==" + node}
 	}
 
-	if len(diskPath) > 0 {
-		conf.HostConfig.Binds = []string{diskID.AsString() + ":" + diskPath}
-	} else {
-		conf.HostConfig.Binds = []string{}
-	}
+	conf.HostConfig.Binds = c.updateBinds(conf.HostConfig.Binds, diskID, diskPath)
 
 	netConfig := c.copyNetworks(conf)
 
@@ -216,7 +223,22 @@ func (c Container) restartByRecreating(diskID apiv1.DiskCID, diskPath string) er
 	return nil
 }
 
-func (c Container) copyNetworks(conf dkrtypes.ContainerJSON) *dkrnet.NetworkingConfig {
+func (Container) updateBinds(binds []string, diskID apiv1.DiskCID, diskPath string) []string {
+	if len(diskPath) > 0 {
+		return append(binds, diskID.AsString()+":"+diskPath)
+	}
+
+	for i, bind := range binds {
+		if strings.HasPrefix(bind, diskID.AsString()+":") {
+			binds = append(binds[:i], binds[i+1:]...)
+			break
+		}
+	}
+
+	return binds
+}
+
+func (Container) copyNetworks(conf dkrtypes.ContainerJSON) *dkrnet.NetworkingConfig {
 	netConfig := &dkrnet.NetworkingConfig{
 		EndpointsConfig: map[string]*dkrnet.EndpointSettings{},
 	}

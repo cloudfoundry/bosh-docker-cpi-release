@@ -53,6 +53,8 @@ func (i FSImporter) ImportFromPath(imagePath string) (Stemcell, error) {
 		return nil, bosherr.WrapError(err, "Generating stemcell id")
 	}
 
+	id = "img-" + id
+
 	file, err := i.fs.OpenFile(imagePath, os.O_RDONLY, os.ModeDir)
 	if err != nil {
 		return nil, bosherr.WrapErrorf(err, "Opening image archive '%s'", imagePath)

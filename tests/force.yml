@@ -1,3 +1,0 @@
-- type: replace
-  path: /force?
-  value: ((force_val))

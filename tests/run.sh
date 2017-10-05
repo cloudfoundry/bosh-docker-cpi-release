@@ -22,7 +22,9 @@ bosh create-env ~/workspace/bosh-deployment/bosh.yml \
   -v internal_gw=10.245.0.1 \
   -v internal_ip=10.245.0.11 \
   -v docker_host=tcp://192.168.50.8:4243 \
-  -l docker-creds.yml \
+  --var-file docker_tls.certificate=<(bosh int ~/workspace/docker-deployment/creds.yml --path /docker_client_ssl/certificate) \
+  --var-file docker_tls.private_key=<(bosh int ~/workspace/docker-deployment/creds.yml --path /docker_client_ssl/private_key) \
+  --var-file docker_tls.ca=<(bosh int ~/workspace/docker-deployment/creds.yml --path /docker_client_ssl/ca) \
   -v network=net3
 
 export BOSH_ENVIRONMENT=10.245.0.11
@@ -36,15 +38,14 @@ bosh -n update-cloud-config ~/workspace/bosh-deployment/docker/cloud-config.yml 
   -v network=net3
 
 echo "-----> `date`: Upload stemcell"
-bosh -n upload-stemcell "https://bosh.io/d/stemcells/bosh-warden-boshlite-ubuntu-trusty-go_agent?v=3312.18" \
-  --sha1 2e1f70938a2b6e8269a721bfb59cf799883b9cc1
+bosh -n upload-stemcell "https://bosh.io/d/stemcells/bosh-warden-boshlite-ubuntu-trusty-go_agent?v=3445.11" \
+  --sha1 d57c48cee58c71dce3707ff117ce79d01cc322ab
 
-echo "-----> `date`: Create env second time to test disk attachment"
+echo "-----> `date`: Create env second time to test persistent disk attachment"
 bosh create-env ~/workspace/bosh-deployment/bosh.yml \
   -o ~/workspace/bosh-deployment/docker/cpi.yml \
   -o ~/workspace/bosh-deployment/jumpbox-user.yml \
   -o ../manifests/dev.yml \
-  -o ./force.yml \
   --state=state.json \
   --vars-store=creds.yml \
   -v docker_cpi_path=$cpi_path \
@@ -53,21 +54,23 @@ bosh create-env ~/workspace/bosh-deployment/bosh.yml \
   -v internal_gw=10.245.0.1 \
   -v internal_ip=10.245.0.11 \
   -v docker_host=tcp://192.168.50.8:4243 \
-  -l docker-creds.yml \
+  --var-file docker_tls.certificate=<(bosh int ~/workspace/docker-deployment/creds.yml --path /docker_client_ssl/certificate) \
+  --var-file docker_tls.private_key=<(bosh int ~/workspace/docker-deployment/creds.yml --path /docker_client_ssl/private_key) \
+  --var-file docker_tls.ca=<(bosh int ~/workspace/docker-deployment/creds.yml --path /docker_client_ssl/ca) \
   -v network=net3 \
-  -v force_val="`date`"
+  --recreate
 
 echo "-----> `date`: Delete previous deployment"
 bosh -n -d zookeeper delete-deployment --force
 
 echo "-----> `date`: Deploy"
-bosh -n -d zookeeper deploy zookeeper.yml
+bosh -n -d zookeeper deploy <(wget -O- https://raw.githubusercontent.com/cppforlife/zookeeper-release/master/manifests/zookeeper.yml)
 
 echo "-----> `date`: Recreate all VMs"
 bosh -n -d zookeeper recreate
 
 echo "-----> `date`: Exercise deployment"
-bosh -n -d zookeeper run-errand smoke_tests
+bosh -n -d zookeeper run-errand smoke-tests
 
 echo "-----> `date`: Restart deployment"
 bosh -n -d zookeeper restart
