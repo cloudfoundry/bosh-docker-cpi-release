@@ -81,7 +81,7 @@ func (n Networks) createDynamicNetwork(netProps NetProps) (string, error) {
 		Driver: netProps.Driver,
 
 		CheckDuplicate: true,
-		EnableIPv6:     false, // todo ipv6 support
+		EnableIPv6:     netProps.EnableIPv6,
 		Internal:       false,
 		Attachable:     false,
 	}
@@ -107,7 +107,7 @@ func (n Networks) createManualNetwork(netProps NetProps, network apiv1.Network) 
 		Driver: netProps.Driver,
 
 		CheckDuplicate: true,
-		EnableIPv6:     false, // todo ipv6 support
+		EnableIPv6:     netProps.EnableIPv6 || newIPAddr(network.IP()).IsV6(),
 		Internal:       false,
 		Attachable:     false,
 
