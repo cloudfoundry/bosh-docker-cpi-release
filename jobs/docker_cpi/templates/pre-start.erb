@@ -1,0 +1,18 @@
+#!/bin/bash
+
+set -e
+
+<%=
+
+result = ''
+docker_host = p('docker_cpi.docker.host')
+unix_prefix = 'unix://'
+
+if docker_host.start_with?(unix_prefix)
+	offset = unix_prefix.length
+	result = "chmod 666 #{docker_host[offset..-1]}"
+end
+
+result
+
+%>

@@ -1,0 +1,38 @@
+---
+- type: replace
+  path: /cloud_provider/mbus
+  value: https://mbus:((mbus_bootstrap_password))@localhost:6868
+
+# Configure VM size
+- type: replace
+  path: /resource_pools/name=vms/cloud_properties/PortBindings?
+  value:
+    22/tcp:
+      - HostIP: 0.0.0.0
+        HostPort: "2222"
+    6868/tcp:
+      - HostIP: 0.0.0.0
+        HostPort: "6868"
+    25555/tcp:
+      - HostIP: 0.0.0.0
+        HostPort: "25555"
+    4222/tcp:
+      - HostIP: 0.0.0.0
+        HostPort: "4222"
+    25250/tcp:
+      - HostIP: 0.0.0.0
+        HostPort: "25250"
+    8443/tcp:
+      - HostIP: 0.0.0.0
+        HostPort: "8443"
+    8080/tcp:
+      - HostIP: 0.0.0.0
+        HostPort: "8080"
+
+- type: replace
+  path: /variables/name=mbus_bootstrap_ssl/options/alternative_names/-
+  value: localhost
+
+- type: replace
+  path: /variables/name=director_ssl/options/alternative_names/-
+  value: localhost
