@@ -53,22 +53,18 @@ func NewFactory(
 	return Factory{fs, uuidGen, opts, logger}
 }
 
-func (f Factory) New(_ apiv1.CallContext) (apiv1.CPI, error) {
-	var httpClient *http.Client
-
-	if f.opts.Docker.RequiresTLS() {
-		var err error
-
-		httpClient, err = f.httpClient()
-		if err != nil {
-			return CPI{}, err
-		}
+func (f Factory) New(ctx apiv1.CallContext) (apiv1.CPI, error) {
+	opts, err := f.dockerOpts(ctx, f.opts.Docker)
+	if err != nil {
+		return CPI{}, err
 	}
 
-	host := f.opts.Docker.Host
-	version := f.opts.Docker.APIVersion
+	httpClient, err := f.httpClient(opts)
+	if err != nil {
+		return CPI{}, err
+	}
 
-	dkrClient, err := dkrclient.NewClient(host, version, httpClient, nil)
+	dkrClient, err := dkrclient.NewClient(opts.Host, opts.APIVersion, httpClient, nil)
 	if err != nil {
 		return CPI{}, err
 	}
@@ -99,13 +95,37 @@ func (f Factory) New(_ apiv1.CallContext) (apiv1.CPI, error) {
 	}, nil
 }
 
-func (f Factory) httpClient() (*http.Client, error) {
+func (Factory) dockerOpts(ctx apiv1.CallContext, defaults DockerOpts) (DockerOpts, error) {
+	var opts DockerOpts
+
+	err := ctx.As(&opts)
+	if err != nil {
+		return DockerOpts{}, bosherr.WrapError(err, "Parsing CPI context")
+	}
+
+	if len(opts.Host) > 0 {
+		err := opts.Validate()
+		if err != nil {
+			return DockerOpts{}, bosherr.WrapError(err, "Validating CPI context")
+		}
+	} else {
+		opts = defaults
+	}
+
+	return opts, nil
+}
+
+func (Factory) httpClient(opts DockerOpts) (*http.Client, error) {
+	if !opts.RequiresTLS() {
+		return nil, nil
+	}
+
 	certPool, err := dkrtlsconfig.SystemCertPool()
 	if err != nil {
 		return nil, bosherr.WrapError(err, "Adding system CA certs")
 	}
 
-	if !certPool.AppendCertsFromPEM([]byte(f.opts.Docker.CACert)) {
+	if !certPool.AppendCertsFromPEM([]byte(opts.TLS.CA)) {
 		return nil, bosherr.WrapError(err, "Appending configured CA certs")
 	}
 
@@ -113,7 +133,7 @@ func (f Factory) httpClient() (*http.Client, error) {
 	tlsConfig.InsecureSkipVerify = false
 	tlsConfig.RootCAs = certPool
 
-	tlsCert, err := tls.X509KeyPair([]byte(f.opts.Docker.Cert), []byte(f.opts.Docker.PrivateKey))
+	tlsCert, err := tls.X509KeyPair([]byte(opts.TLS.Certificate), []byte(opts.TLS.PrivateKey))
 	if err != nil {
 		return nil, bosherr.WrapError(err, "Loading X509 key pair (make sure the key is not encrypted)")
 	}

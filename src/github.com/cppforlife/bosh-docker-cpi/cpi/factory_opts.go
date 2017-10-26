@@ -14,11 +14,14 @@ type FactoryOpts struct {
 
 type DockerOpts struct {
 	Host       string
-	APIVersion string
+	APIVersion string `json:"api_version"`
+	TLS        DockerOptsTLS
+}
 
-	CACert     string
-	Cert       string
-	PrivateKey string
+type DockerOptsTLS struct {
+	CA          string
+	Certificate string
+	PrivateKey  string `json:"private_key"`
 }
 
 func (o FactoryOpts) Validate() error {
@@ -49,15 +52,15 @@ func (o DockerOpts) Validate() error {
 	}
 
 	if o.RequiresTLS() {
-		if len(o.CACert) == 0 {
-			return bosherr.Error("Must provide non-empty CACert")
+		if len(o.TLS.CA) == 0 {
+			return bosherr.Error("Must provide non-empty CA")
 		}
 
-		if len(o.Cert) == 0 {
-			return bosherr.Error("Must provide non-empty Cert")
+		if len(o.TLS.Certificate) == 0 {
+			return bosherr.Error("Must provide non-empty Certificate")
 		}
 
-		if len(o.PrivateKey) == 0 {
+		if len(o.TLS.PrivateKey) == 0 {
 			return bosherr.Error("Must provide non-empty PrivateKey")
 		}
 	}

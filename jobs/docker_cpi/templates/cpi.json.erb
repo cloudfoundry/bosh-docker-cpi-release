@@ -3,10 +3,11 @@
 config = {
   "Actions" => {
     "Docker" => {
-      "Host"       => p("docker_cpi.docker.host"),
-      "APIVersion" => p("docker_cpi.docker.api_version"),
+      "host"        => p("docker_cpi.docker.host"),
+      "api_version" => p("docker_cpi.docker.api_version"),
     },
 
+    # todo remove agent
     "Agent" => {
       "Mbus" => p("docker_cpi.agent.mbus"),
       "NTP"  => p("docker_cpi.agent.ntp"),
@@ -21,10 +22,12 @@ config = {
 
 docker = config["Actions"]["Docker"]
 
-if !docker["Host"].start_with?("unix://")
-  docker["CACert"]     = p("docker_cpi.docker.tls.ca")
-  docker["Cert"]       = p("docker_cpi.docker.tls.certificate")
-  docker["PrivateKey"] = p("docker_cpi.docker.tls.private_key")
+if !docker.fetch("host").start_with?("unix://")
+  docker["tls"] = {
+    "ca"          => p("docker_cpi.docker.tls.ca"),
+    "certificate" => p("docker_cpi.docker.tls.certificate"),
+    "private_key" => p("docker_cpi.docker.tls.private_key"),
+  }
 end
 
 JSON.dump(config)
