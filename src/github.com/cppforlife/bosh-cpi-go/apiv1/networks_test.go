@@ -175,5 +175,14 @@ var _ = Describe("Network", func() {
 			net := NewNetwork(NetworkOpts{IP: "12.18.3.4", Netmask: "255.255.255.0"})
 			Expect(net.IPWithSubnetMask()).To(Equal("12.18.3.4/24"))
 		})
+
+		It("returns fd7e:964d:32c6:777c:0000:0000:0000:0006/64 when IP is "+
+			"fd7e:964d:32c6:777c:0000:0000:0000:0006 and netmask is ffff:ffff:ffff:ffff:0000:0000:0000:0000", func() {
+			net := NewNetwork(NetworkOpts{
+				IP:      "fd7e:964d:32c6:777c:0000:0000:0000:0006",
+				Netmask: "ffff:ffff:ffff:ffff:0000:0000:0000:0000",
+			})
+			Expect(net.IPWithSubnetMask()).To(Equal("fd7e:964d:32c6:777c:0000:0000:0000:0006/64"))
+		})
 	})
 })

@@ -114,9 +114,13 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	vmProps = f.cleanMounts(vmProps)
 
 	endPtConfig := &dkrnet.EndpointSettings{
-		IPAMConfig: &dkrnet.EndpointIPAMConfig{
-			IPv4Address: network.IP(),
-		},
+		IPAMConfig: &dkrnet.EndpointIPAMConfig{},
+	}
+
+	if newIPAddr(network.IP()).IsV6() {
+		endPtConfig.IPAMConfig.IPv6Address = network.IP()
+	} else {
+		endPtConfig.IPAMConfig.IPv4Address = network.IP()
 	}
 
 	netConfig := &dkrnet.NetworkingConfig{

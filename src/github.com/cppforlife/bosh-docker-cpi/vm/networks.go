@@ -19,7 +19,7 @@ var (
 	// conflicts with network 6255ad39454ee358... (br-6255ad39454e):
 	// networks have overlapping IPv4
 	conflictingNetMatch = regexp.MustCompile(
-		`conflicts with network (.+) \(.+\): networks have overlapping IPv4`)
+		`conflicts with network (.+) \(.+\): networks have overlapping IPv[46]`)
 
 	// network with name foo3 already exists
 	alreadyExistsCheck = "already exists"
@@ -81,7 +81,7 @@ func (n Networks) createDynamicNetwork(netProps NetProps) (string, error) {
 		Driver: netProps.Driver,
 
 		CheckDuplicate: true,
-		EnableIPv6:     false, // todo ipv6 support
+		EnableIPv6:     netProps.EnableIPv6,
 		Internal:       false,
 		Attachable:     false,
 	}
@@ -107,7 +107,7 @@ func (n Networks) createManualNetwork(netProps NetProps, network apiv1.Network) 
 		Driver: netProps.Driver,
 
 		CheckDuplicate: true,
-		EnableIPv6:     false, // todo ipv6 support
+		EnableIPv6:     netProps.EnableIPv6 || newIPAddr(network.IP()).IsV6(),
 		Internal:       false,
 		Attachable:     false,
 

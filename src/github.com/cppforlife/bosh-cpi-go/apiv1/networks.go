@@ -164,6 +164,10 @@ func (n NetworkImpl) IsDynamic() bool {
 }
 
 func (n NetworkImpl) IPWithSubnetMask() string {
-	ones, _ := gonet.IPMask(gonet.ParseIP(n.Netmask()).To4()).Size()
+	netmaskIP := gonet.ParseIP(n.Netmask())
+	if v4 := netmaskIP.To4(); v4 != nil {
+		netmaskIP = v4
+	}
+	ones, _ := gonet.IPMask(netmaskIP).Size()
 	return fmt.Sprintf("%s/%d", n.IP(), ones)
 }

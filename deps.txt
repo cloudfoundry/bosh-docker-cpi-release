@@ -1,5 +1,5 @@
 f6c3861 github.com/cloudfoundry/bosh-utils/.git
-f44a913 github.com/cppforlife/bosh-cpi-go/.git
+f1982c3 github.com/cppforlife/bosh-cpi-go/.git
 df5327f github.com/docker/distribution/.git
 4290f40 github.com/docker/engine-api/.git
 7da10c8 github.com/docker/go-connections/.git
