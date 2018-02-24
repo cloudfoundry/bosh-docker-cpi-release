@@ -62,6 +62,17 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		return nil, bosherr.WrapError(err, "Enabling networks")
 	}
 
+	networkInitBashCmd := ""
+
+	if newIPAddr(network.IP()).IsV6() {
+		// Docker seems to add IPv4 address to the container
+		// regardless if one was requested; remove it
+		networkInitBashCmd = strings.Join([]string{
+			`dynamic_net=$(ip addr show eth0 | grep "inet\b" | awk '{print $2}')`,
+			`ip addr del $dynamic_net dev eth0`,
+		}, " && ")
+	}
+
 	idStr, err := f.uuidGen.Generate()
 	if err != nil {
 		return nil, bosherr.WrapError(err, "Generating container ID")
@@ -78,15 +89,16 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		// todo hacky umount to avoid conflicting with bosh dns updates
 		// todo why perms are wrong on /var/vcap/data
 		// todo dont need to create /var/vcap/store
-		Cmd: dkrstrslice.StrSlice{"bash", "-c", `
-      umount /etc/resolv.conf && \
-      umount /etc/hosts && \
-      umount /etc/hostname && \
-      rm -rf /var/vcap/data/sys && \
-      mkdir -p /var/vcap/data/sys && \
-      mkdir -p /var/vcap/store && \
-      exec env -i /usr/sbin/runsvdir-start
-    `},
+		Cmd: dkrstrslice.StrSlice{"bash", "-c", strings.Join([]string{
+      `umount /etc/resolv.conf`,
+      `umount /etc/hosts`,
+      `umount /etc/hostname`,
+      networkInitBashCmd,
+      `rm -rf /var/vcap/data/sys`,
+      `mkdir -p /var/vcap/data/sys`,
+      `mkdir -p /var/vcap/store`,
+      `exec env -i /usr/sbin/runsvdir-start`,
+    }, " && ")},
 
 		Env: []string{"reschedule:on-node-failure"},
 	}
