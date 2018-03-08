@@ -39,36 +39,95 @@ func NewNetworks(
 	return Networks{dkrClient, uuidGen, networks}
 }
 
-func (n Networks) Enable() (NetProps, apiv1.Network, error) {
+func (n Networks) Enable() (string, *dkrnet.NetworkingConfig, error) {
 	if len(n.networks) == 0 {
-		return NetProps{}, nil, bosherr.Error("Expected exactly one network; received zero")
+		return "", nil, bosherr.Error("Expected exactly one network; received zero")
 	}
 
-	for _, net := range n.networks {
+	var netConfigPairs []netConfigPair
+	onlyHasIPv6Networks := true
+
+	for name, net := range n.networks {
 		net.SetPreconfigured()
+
+		netProps, err := n.enableSingleNetwork(net)
+		if err != nil {
+			return "", nil, bosherr.WrapErrorf(err, "Enabling network '%s'", name)
+		}
+
+		netConfigPairs = append(netConfigPairs, netConfigPair{net, netProps})
+
+		if !newIPAddr(net.IP()).IsV6() {
+			onlyHasIPv6Networks = false
+		}
 	}
 
+	networkInitBashCmd := " : " // bash noop
+
+	if onlyHasIPv6Networks {
+		// Docker seems to add IPv4 address to the container
+		// regardless if one was requested on IPv6 interfaces; remove them.
+		// Ignore fe80:: addresses — they appear on ALL interfaces.
+		// Similarly we ignore the loopback (::1) interfaces.
+		networkInitBashCmd = strings.Join([]string{
+			// make sure there are no tabs
+      `for DEV in $(grep -E -v "^fe80|^0{31}1" /proc/net/if_inet6 | awk '{print $6}'); do`,
+				`ip addr del $(ip -4 addr show $DEV | grep "inet" | awk '{print $2}') dev $DEV`,
+			`done`,
+		}, "\n")
+	}
+
+	return networkInitBashCmd, n.networkingConfig(netConfigPairs), nil
+}
+
+type netConfigPair struct {
+	Network apiv1.Network
+	Props   NetProps
+}
+
+func (n Networks) networkingConfig(netConfigPairs []netConfigPair) *dkrnet.NetworkingConfig {
+	netConfig := &dkrnet.NetworkingConfig{
+		EndpointsConfig: map[string]*dkrnet.EndpointSettings{},
+	}
+
+	for _, pair := range netConfigPairs {
+		endPtConfig := &dkrnet.EndpointSettings{
+			IPAMConfig: &dkrnet.EndpointIPAMConfig{},
+		}
+
+		if newIPAddr(pair.Network.IP()).IsV6() {
+			endPtConfig.IPAMConfig.IPv6Address = pair.Network.IP()
+		} else {
+			endPtConfig.IPAMConfig.IPv4Address = pair.Network.IP()
+		}
+
+		netConfig.EndpointsConfig[pair.Props.Name] = endPtConfig
+	}
+
+	return netConfig
+}
+
+func (n Networks) enableSingleNetwork(network apiv1.Network) (NetProps, error) {
 	netProps := NetProps{Driver: "bridge"}
-	network := n.networks.Default()
 
 	err := network.CloudProps().As(&netProps)
 	if err != nil {
-		return NetProps{}, nil, bosherr.WrapError(err, "Unmarshaling network properties")
+		return NetProps{}, bosherr.WrapError(err, "Unmarshaling network properties")
 	}
 
 	if len(network.Netmask()) == 0 {
 		netProps.Name, err = n.createDynamicNetwork(netProps)
 		if err != nil {
-			return NetProps{}, nil, bosherr.WrapError(err, "Creating dynamic network")
+			return NetProps{}, bosherr.WrapError(err, "Creating dynamic network")
 		}
 	} else {
 		netProps.Name, err = n.createManualNetwork(netProps, network)
 		if err != nil {
-			return NetProps{}, nil, bosherr.WrapError(err, "Creating manual network")
+			return NetProps{}, bosherr.WrapError(err, "Creating manual network")
 		}
 	}
 
-	return netProps, network, nil
+	return netProps, nil
 }
 
 func (n Networks) createDynamicNetwork(netProps NetProps) (string, error) {

@@ -206,11 +206,19 @@ func (c Container) restartByRecreating(diskID apiv1.DiskCID, diskPath string) er
 	conf.HostConfig.Binds = c.updateBinds(conf.HostConfig.Binds, diskID, diskPath)
 
 	netConfig := c.copyNetworks(conf)
+	netConfig, additionalEndPtConfigs := splitNetworkSettings(netConfig)
 
 	_, err = c.dkrClient.ContainerCreate(
 		context.TODO(), conf.Config, conf.HostConfig, netConfig, c.id.AsString())
 	if err != nil {
 		return bosherr.WrapError(err, "Creating container")
+	}
+
+	for name, endPtConfig := range additionalEndPtConfigs {
+		err := c.dkrClient.NetworkConnect(context.TODO(), name, c.id.AsString(), endPtConfig)
+		if err != nil {
+			return bosherr.WrapErrorf(err, "Connecting container to network '%s'", name)
+		}
 	}
 
 	err = c.dkrClient.ContainerStart(
