@@ -12,7 +12,6 @@ import (
 	dkrtypes "github.com/docker/engine-api/types"
 	dkrcont "github.com/docker/engine-api/types/container"
 	dkrfilters "github.com/docker/engine-api/types/filters"
-	dkrnet "github.com/docker/engine-api/types/network"
 	dkrstrslice "github.com/docker/engine-api/types/strslice"
 	dkrnat "github.com/docker/go-connections/nat"
 
@@ -57,20 +56,9 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		return Container{}, bosherr.WrapError(err, "Unmarshaling VM properties")
 	}
 
-	netProps, network, err := NewNetworks(f.dkrClient, f.uuidGen, networks).Enable()
+	networkInitBashCmd, netConfig, err := NewNetworks(f.dkrClient, f.uuidGen, networks).Enable()
 	if err != nil {
 		return nil, bosherr.WrapError(err, "Enabling networks")
-	}
-
-	networkInitBashCmd := ""
-
-	if newIPAddr(network.IP()).IsV6() {
-		// Docker seems to add IPv4 address to the container
-		// regardless if one was requested; remove it
-		networkInitBashCmd = strings.Join([]string{
-			`dynamic_net=$(ip addr show eth0 | grep "inet\b" | awk '{print $2}')`,
-			`ip addr del $dynamic_net dev eth0`,
-		}, " && ")
 	}
 
 	idStr, err := f.uuidGen.Generate()
@@ -90,15 +78,15 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		// todo why perms are wrong on /var/vcap/data
 		// todo dont need to create /var/vcap/store
 		Cmd: dkrstrslice.StrSlice{"bash", "-c", strings.Join([]string{
-      `umount /etc/resolv.conf`,
-      `umount /etc/hosts`,
-      `umount /etc/hostname`,
-      networkInitBashCmd,
-      `rm -rf /var/vcap/data/sys`,
-      `mkdir -p /var/vcap/data/sys`,
-      `mkdir -p /var/vcap/store`,
-      `exec env -i /usr/sbin/runsvdir-start`,
-    }, " && ")},
+			`umount /etc/resolv.conf`,
+			`umount /etc/hosts`,
+			`umount /etc/hostname`,
+			networkInitBashCmd,
+			`rm -rf /var/vcap/data/sys`,
+			`mkdir -p /var/vcap/data/sys`,
+			`mkdir -p /var/vcap/store`,
+			`exec env -i /usr/sbin/runsvdir-start`,
+		}, " && ")},
 
 		Env: []string{"reschedule:on-node-failure"},
 	}
@@ -125,25 +113,11 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 
 	vmProps = f.cleanMounts(vmProps)
 
-	endPtConfig := &dkrnet.EndpointSettings{
-		IPAMConfig: &dkrnet.EndpointIPAMConfig{},
-	}
-
-	if newIPAddr(network.IP()).IsV6() {
-		endPtConfig.IPAMConfig.IPv6Address = network.IP()
-	} else {
-		endPtConfig.IPAMConfig.IPv4Address = network.IP()
-	}
-
-	netConfig := &dkrnet.NetworkingConfig{
-		EndpointsConfig: map[string]*dkrnet.EndpointSettings{
-			netProps.Name: endPtConfig,
-		},
-	}
-
 	vmProps.HostConfig.Binds = []string{EphemeralDiskCID{id}.AsString() + ":/var/vcap/data/"}
 
 	f.logger.Debug(f.logTag, "Creating container %#v, host %#v", containerConfig, &vmProps.HostConfig)
+
+	netConfig, additionalEndPtConfigs := splitNetworkSettings(netConfig)
 
 	container, err := f.dkrClient.ContainerCreate(
 		context.TODO(), containerConfig, &vmProps.HostConfig, netConfig, id.AsString())
@@ -151,14 +125,15 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		return Container{}, bosherr.WrapError(err, "Creating container")
 	}
 
-	f.logger.Debug(f.logTag, "Connecting container '%s' to network '%s' with opts %#v",
-		container.ID, netProps.Name, endPtConfig)
+	f.logger.Debug(f.logTag,
+		"Connecting container '%s' to networks with opts %#v", container.ID, netConfig)
 
-	// todo attach additional networks
-	// err = f.dkrClient.NetworkConnect(context.TODO(), netProps.Name, id.AsString(), endPtConfig)
-	// if err != nil {
-	//  return Container{}, bosherr.WrapError(err, "Connecting container to network")
-	// }
+	for name, endPtConfig := range additionalEndPtConfigs {
+		err := f.dkrClient.NetworkConnect(context.TODO(), name, id.AsString(), endPtConfig)
+		if err != nil {
+			return Container{}, bosherr.WrapErrorf(err, "Connecting container to network '%s'", name)
+		}
+	}
 
 	err = f.dkrClient.ContainerStart(context.TODO(), id.AsString(), dkrtypes.ContainerStartOptions{})
 	if err != nil {
