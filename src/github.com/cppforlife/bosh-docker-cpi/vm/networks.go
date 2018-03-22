@@ -134,10 +134,7 @@ func (n Networks) createManualNetwork(netProps NetProps, network apiv1.Network) 
 			}
 
 			if len(netProps.Name) > 0 {
-				return "", bosherr.WrapErrorf(err,
-					"Expected network '%s' to not have subnet '%s' "+
-						"while trying to create network '%s' with the same subnet",
-					matches[1], network.IPWithSubnetMask(), netProps.Name)
+				return name, nil
 			}
 
 			return matches[1], nil
