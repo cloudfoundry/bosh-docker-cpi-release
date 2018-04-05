@@ -2,7 +2,8 @@
 name: docker_cpi
 
 dependencies:
-- golang_1.7
+- golang-1-linux
+- golang-1-darwin
 
 files:
 - "**/*.go"

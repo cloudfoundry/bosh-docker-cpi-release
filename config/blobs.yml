@@ -1,8 +1,2 @@
-golang_1.7/go1.7.4.darwin-amd64.tar.gz:
-  size: 83749804
-  object_id: f9a8e7a0-35d0-485e-59d0-1ea55c96dfa4
-  sha: 1ffa4dd85e10f391735c3cd71df61586e3c62381
-golang_1.7/go1.7.4.linux-amd64.tar.gz:
-  size: 84021919
-  object_id: c2b8f213-87a0-40c0-4a6a-5b07ead07ab7
-  sha: 2e5baf03d1590e048c84d1d5b4b6f2540efaaea1
+---
+{}

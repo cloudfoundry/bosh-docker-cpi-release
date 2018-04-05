@@ -1,8 +1,0 @@
----
-name: golang_1.7
-
-dependencies: []
-
-files:
-- golang_1.7/go1.7.4.linux-amd64.tar.gz
-- golang_1.7/go1.7.4.darwin-amd64.tar.gz
