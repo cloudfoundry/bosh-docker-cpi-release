@@ -95,10 +95,12 @@ func (n Networks) networkingConfig(netConfigPairs []netConfigPair) *dkrnet.Netwo
 			IPAMConfig: &dkrnet.EndpointIPAMConfig{},
 		}
 
-		if newIPAddr(pair.Network.IP()).IsV6() {
-			endPtConfig.IPAMConfig.IPv6Address = pair.Network.IP()
-		} else {
-			endPtConfig.IPAMConfig.IPv4Address = pair.Network.IP()
+		if len(pair.Network.Netmask()) != 0 {
+			if newIPAddr(pair.Network.IP()).IsV6() {
+				endPtConfig.IPAMConfig.IPv6Address = pair.Network.IP()
+			} else {
+				endPtConfig.IPAMConfig.IPv4Address = pair.Network.IP()
+			}
 		}
 
 		netConfig.EndpointsConfig[pair.Props.Name] = endPtConfig
