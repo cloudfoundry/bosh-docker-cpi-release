@@ -23,6 +23,9 @@ var (
 
 	// network with name foo3 already exists
 	alreadyExistsCheck = "already exists"
+
+	// operation is not permitted on predefined bridge network
+	predifinedNetworkCheck = "not permitted on predefined"
 )
 
 type Networks struct {
@@ -149,7 +152,8 @@ func (n Networks) createDynamicNetwork(netProps NetProps) (string, error) {
 
 	_, err := n.dkrClient.NetworkCreate(context.TODO(), netProps.Name, createOpts)
 	if err != nil {
-		if !strings.Contains(err.Error(), alreadyExistsCheck) {
+		if !(strings.Contains(err.Error(), alreadyExistsCheck) ||
+			strings.Contains(err.Error(), predifinedNetworkCheck)) {
 			return "", err
 		}
 	}
