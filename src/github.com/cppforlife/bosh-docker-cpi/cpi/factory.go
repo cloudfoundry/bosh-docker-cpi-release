@@ -96,12 +96,14 @@ func (f Factory) New(ctx apiv1.CallContext) (apiv1.CPI, error) {
 }
 
 func (Factory) dockerOpts(ctx apiv1.CallContext, defaults DockerOpts) (DockerOpts, error) {
-	var opts DockerOpts
+	var factOpts FactoryOpts
 
-	err := ctx.As(&opts)
+	err := ctx.As(&factOpts)
 	if err != nil {
 		return DockerOpts{}, bosherr.WrapError(err, "Parsing CPI context")
 	}
+
+	opts := factOpts.Docker
 
 	if len(opts.Host) > 0 {
 		err := opts.Validate()
