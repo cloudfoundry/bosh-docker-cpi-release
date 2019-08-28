@@ -98,7 +98,7 @@ func (n Networks) networkingConfig(netConfigPairs []netConfigPair) *dkrnet.Netwo
 			IPAMConfig: &dkrnet.EndpointIPAMConfig{},
 		}
 
-		if len(pair.Network.Netmask()) != 0 {
+		if !pair.Network.IsDynamic() {
 			if newIPAddr(pair.Network.IP()).IsV6() {
 				endPtConfig.IPAMConfig.IPv6Address = pair.Network.IP()
 			} else {
@@ -120,7 +120,7 @@ func (n Networks) enableSingleNetwork(network apiv1.Network) (NetProps, error) {
 		return NetProps{}, bosherr.WrapError(err, "Unmarshaling network properties")
 	}
 
-	if len(network.Netmask()) == 0 {
+	if network.IsDynamic() {
 		netProps.Name, err = n.createDynamicNetwork(netProps)
 		if err != nil {
 			return NetProps{}, bosherr.WrapError(err, "Creating dynamic network")
