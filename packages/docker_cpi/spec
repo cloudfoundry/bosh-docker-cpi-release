@@ -6,9 +6,7 @@ dependencies:
 - golang-1-darwin
 
 files:
-- "**/*.go"
-- "**/*.s"
-
-excluded_files:
-- github.com/onsi/ginkgo/**/*
-- github.com/onsi/gomega/**/*
+- "bosh-docker-cpi/**/*.go"
+- "bosh-docker-cpi/**/*.s"
+- "bosh-docker-cpi/go.{mod,sum}"
+- "bosh-docker-cpi/vendor/modules.txt"

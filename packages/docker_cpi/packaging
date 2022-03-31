@@ -12,14 +12,14 @@ mkdir ../src && cp -a * ../src/ && mv ../src ./src
 
 mkdir -p $BOSH_INSTALL_TARGET/bin
 
-export GOARCH=amd64
-export GOOS=darwin
-export GOTOOLDIR=$GOROOT/pkg/darwin_amd64
+pushd src/bosh-docker-cpi/main
+  export GOARCH=amd64
+  export GOOS=darwin
+  export GOTOOLDIR=$GOROOT/pkg/darwin_amd64
+  go build -o $BOSH_INSTALL_TARGET/bin/cpi-darwin
 
-go build -o $BOSH_INSTALL_TARGET/bin/cpi-darwin src/github.com/cppforlife/bosh-docker-cpi/main/*.go
-
-export GOARCH=amd64
-export GOOS=linux
-export GOTOOLDIR=$GOROOT/pkg/linux_amd64
-
-go build -o $BOSH_INSTALL_TARGET/bin/cpi-linux src/github.com/cppforlife/bosh-docker-cpi/main/*.go
+  export GOARCH=amd64
+  export GOOS=linux
+  export GOTOOLDIR=$GOROOT/pkg/linux_amd64
+  go build -o $BOSH_INSTALL_TARGET/bin/cpi-linux
+popd
