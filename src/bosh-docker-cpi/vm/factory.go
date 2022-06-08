@@ -85,6 +85,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			`rm -rf /var/vcap/data/sys`,
 			`mkdir -p /var/vcap/data/sys`,
 			`mkdir -p /var/vcap/store`,
+			"sed -i 's/chronyc/# chronyc/g' /var/vcap/bosh/bin/sync-time",
 			`exec env -i /usr/sbin/runsvdir-start`,
 		}, " && ")},
 
