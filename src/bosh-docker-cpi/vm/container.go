@@ -139,7 +139,7 @@ func (c Container) AttachDisk(disk bdisk.Disk) (apiv1.DiskHint, error) {
 	diskHint := apiv1.NewDiskHintFromString(path)
 	agentEnv.AttachPersistentDisk(disk.ID(), diskHint)
 
-	err = c.restartByRecreating(disk.ID(), path)
+	err = c.restartByCloning(disk.ID(), path)
 	if err != nil {
 		return apiv1.DiskHint{}, bosherr.WrapError(err, "Restarting by recreating")
 	}
@@ -169,7 +169,7 @@ func (c Container) DetachDisk(disk bdisk.Disk) error {
 
 	agentEnv.DetachPersistentDisk(disk.ID())
 
-	err = c.restartByRecreating(disk.ID(), "")
+	err = c.restartByCloning(disk.ID(), "")
 	if err != nil {
 		return bosherr.WrapError(err, "Restarting by recreating")
 	}
@@ -183,11 +183,34 @@ func (c Container) DetachDisk(disk bdisk.Disk) error {
 	return nil
 }
 
-func (c Container) restartByRecreating(diskID apiv1.DiskCID, diskPath string) error {
+func (c Container) restartByCloning(diskID apiv1.DiskCID, diskPath string) error {
 	conf, err := c.dkrClient.ContainerInspect(context.TODO(), c.id.AsString())
 	if err != nil {
 		return bosherr.WrapError(err, "Inspecting container")
 	}
+
+	snapshotName := c.id.AsString() + "-snapshot"
+	duration := 10 * time.Second
+	err = c.dkrClient.ContainerStop(context.TODO(), c.id.AsString(), &duration)
+	if err != nil {
+		return bosherr.WrapError(err, "Stopping a container")
+	}
+
+	_, err = c.dkrClient.ContainerCommit(context.TODO(), c.id.AsString(), dkrtypes.ContainerCommitOptions{
+		Reference: snapshotName,
+	})
+	if err != nil {
+		return bosherr.WrapError(err, "Creating a snapshot of a container")
+	}
+
+	defer func() {
+		_, defErr := c.dkrClient.ImageRemove(context.TODO(), snapshotName, dkrtypes.ImageRemoveOptions{Force: true})
+		if defErr != nil {
+			c.logger.Error("container-restart-by-recreating", defErr.Error())
+		}
+	}()
+
+	conf.Config.Image = snapshotName
 
 	err = c.Delete()
 	if err != nil {
