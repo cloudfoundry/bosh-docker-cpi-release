@@ -135,11 +135,17 @@ func (c Container) AttachDisk(disk bdisk.Disk) (apiv1.DiskHint, error) {
 		return apiv1.DiskHint{}, bosherr.WrapError(err, "Fetching agent env")
 	}
 
+	fileService := NewFileService(c.dkrClient, c.id, c.logger)
+	updateSettings, err := fileService.Download("/var/vcap/bosh/update_settings.json")
+	if err != nil {
+		return apiv1.DiskHint{}, bosherr.WrapError(err, "Fetching update_settings.json")
+	}
+
 	path := filepath.Join("/warden-cpi-dev", disk.ID().AsString())
 	diskHint := apiv1.NewDiskHintFromString(path)
 	agentEnv.AttachPersistentDisk(disk.ID(), diskHint)
 
-	err = c.restartByCloning(disk.ID(), path)
+	err = c.restartByRecreating(disk.ID(), path)
 	if err != nil {
 		return apiv1.DiskHint{}, bosherr.WrapError(err, "Restarting by recreating")
 	}
@@ -147,6 +153,13 @@ func (c Container) AttachDisk(disk bdisk.Disk) (apiv1.DiskHint, error) {
 	err = c.agentEnvService.Update(agentEnv)
 	if err != nil {
 		return apiv1.DiskHint{}, bosherr.WrapError(err, "Updating agent env")
+	}
+
+	if len(updateSettings) > 0 {
+		err = fileService.Upload("/var/vcap/bosh/update_settings.json", updateSettings)
+		if err != nil {
+			return apiv1.DiskHint{}, bosherr.WrapError(err, "Restoring update_settings.json")
+		}
 	}
 
 	return diskHint, nil
@@ -167,9 +180,15 @@ func (c Container) DetachDisk(disk bdisk.Disk) error {
 		return bosherr.WrapError(err, "Fetching agent env")
 	}
 
+	fileService := NewFileService(c.dkrClient, c.id, c.logger)
+	updateSettings, err := fileService.Download("/var/vcap/bosh/update_settings.json")
+	if err != nil {
+		return bosherr.WrapError(err, "Fetching update_settings.json")
+	}
+
 	agentEnv.DetachPersistentDisk(disk.ID())
 
-	err = c.restartByCloning(disk.ID(), "")
+	err = c.restartByRecreating(disk.ID(), "")
 	if err != nil {
 		return bosherr.WrapError(err, "Restarting by recreating")
 	}
@@ -180,37 +199,21 @@ func (c Container) DetachDisk(disk bdisk.Disk) error {
 		return bosherr.WrapError(err, "Updating agent env")
 	}
 
+	if len(updateSettings) > 0 {
+		err = fileService.Upload("/var/vcap/bosh/update_settings.json", updateSettings)
+		if err != nil {
+			return bosherr.WrapError(err, "Restoring update_settings.json")
+		}
+	}
+
 	return nil
 }
 
-func (c Container) restartByCloning(diskID apiv1.DiskCID, diskPath string) error {
+func (c Container) restartByRecreating(diskID apiv1.DiskCID, diskPath string) error {
 	conf, err := c.dkrClient.ContainerInspect(context.TODO(), c.id.AsString())
 	if err != nil {
 		return bosherr.WrapError(err, "Inspecting container")
 	}
-
-	snapshotName := c.id.AsString() + "-snapshot"
-	duration := 10 * time.Second
-	err = c.dkrClient.ContainerStop(context.TODO(), c.id.AsString(), &duration)
-	if err != nil {
-		return bosherr.WrapError(err, "Stopping a container")
-	}
-
-	_, err = c.dkrClient.ContainerCommit(context.TODO(), c.id.AsString(), dkrtypes.ContainerCommitOptions{
-		Reference: snapshotName,
-	})
-	if err != nil {
-		return bosherr.WrapError(err, "Creating a snapshot of a container")
-	}
-
-	defer func() {
-		_, defErr := c.dkrClient.ImageRemove(context.TODO(), snapshotName, dkrtypes.ImageRemoveOptions{Force: true})
-		if defErr != nil {
-			c.logger.Error("container-restart-by-recreating", defErr.Error())
-		}
-	}()
-
-	conf.Config.Image = snapshotName
 
 	err = c.Delete()
 	if err != nil {
