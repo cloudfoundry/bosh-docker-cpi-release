@@ -138,7 +138,7 @@ func (c Container) AttachDisk(disk bdisk.Disk) (apiv1.DiskHint, error) {
 	fileService := NewFileService(c.dkrClient, c.id, c.logger)
 	updateSettings, err := fileService.Download("/var/vcap/bosh/update_settings.json")
 	if err != nil {
-		return apiv1.DiskHint{}, bosherr.WrapError(err, "Fetching update_settings.json")
+		c.logger.Warn("attach-disk", "Unable to find update_settings.json skipping: %s", err)
 	}
 
 	path := filepath.Join("/warden-cpi-dev", disk.ID().AsString())
@@ -183,7 +183,7 @@ func (c Container) DetachDisk(disk bdisk.Disk) error {
 	fileService := NewFileService(c.dkrClient, c.id, c.logger)
 	updateSettings, err := fileService.Download("/var/vcap/bosh/update_settings.json")
 	if err != nil {
-		return bosherr.WrapError(err, "Fetching update_settings.json")
+		c.logger.Warn("detach-disk", "Unable to find update_settings.json skipping: %s", err)
 	}
 
 	agentEnv.DetachPersistentDisk(disk.ID())
