@@ -59,11 +59,6 @@ func (f AgentEnvFactory) ForVM(
 		Mbus: agentOptions.Mbus,
 		NTP:  agentOptions.NTP,
 
-		Blobstore: BlobstoreSpec{
-			Provider: agentOptions.Blobstore.Type,
-			Options:  agentOptions.Blobstore.Options,
-		},
-
 		Networks: networksSpec,
 
 		Env: EnvSpec(env.val), // todo deep copy env?

@@ -9,7 +9,7 @@ go fmt github.com/cppforlife/bosh-docker-cpi/...
 let "result+=$?"
 
 echo -e "\n Testing packages..."
-ginkgo -r $bin/..
+go run github.com/onsi/ginkgo/ginkgo -r $bin/..
 let "result+=$?"
 
 # todo vet

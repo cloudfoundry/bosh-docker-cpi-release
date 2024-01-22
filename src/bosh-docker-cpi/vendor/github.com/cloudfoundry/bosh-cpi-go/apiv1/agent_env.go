@@ -29,8 +29,6 @@ type agentEnvSpec struct {
 	Mbus string   `json:"mbus"`
 	NTP  []string `json:"ntp"`
 
-	Blobstore BlobstoreSpec `json:"blobstore"`
-
 	Networks NetworksSpec `json:"networks"`
 
 	Disks DisksSpec `json:"disks"`
@@ -71,11 +69,6 @@ type DisksSpec struct {
 type PersistentSpec map[string]DiskHint
 
 type EnvSpec map[string]interface{}
-
-type BlobstoreSpec struct {
-	Provider string                 `json:"provider"`
-	Options  map[string]interface{} `json:"options"`
-}
 
 func (ae *AgentEnvImpl) AttachSystemDisk(hint DiskHint) {
 	ae.spec.Disks.System = hint
