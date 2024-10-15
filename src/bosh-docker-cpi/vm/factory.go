@@ -49,7 +49,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	cloudProps apiv1.VMCloudProps, networks apiv1.Networks,
 	diskCIDs []apiv1.DiskCID, env apiv1.VMEnv) (VM, error) {
 
-	var vmProps VMProps
+	var vmProps Props
 
 	err := cloudProps.As(&vmProps)
 	if err != nil {
@@ -198,7 +198,7 @@ func (f Factory) possiblyFindNodeWithDisk(diskID apiv1.DiskCID) (string, error) 
 	return "", nil
 }
 
-func (f Factory) cleanMounts(vmProps VMProps) VMProps {
+func (f Factory) cleanMounts(vmProps Props) Props {
 	const unixSock = "unix://"
 
 	for i := range vmProps.HostConfig.Mounts {

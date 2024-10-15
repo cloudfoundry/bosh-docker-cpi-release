@@ -5,7 +5,7 @@ import (
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-type VMProps struct {
+type Props struct {
 	ExposedPorts []string `json:"ports"` // [6868/tcp]
 
 	// Allow all Docker options

@@ -9,10 +9,10 @@ import (
 	. "bosh-docker-cpi/vm"
 )
 
-var _ = Describe("VMProps", func() {
+var _ = Describe("Props", func() {
 	Describe("Unmarshal", func() {
 		It("picks up Docker configuration", func() {
-			var props VMProps
+			var props Props
 
 			err := json.Unmarshal([]byte(`{"CPUShares": 10, "Memory": 1024}`), &props)
 			Expect(err).ToNot(HaveOccurred())
