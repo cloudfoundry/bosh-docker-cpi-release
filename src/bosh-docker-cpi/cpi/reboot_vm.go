@@ -10,6 +10,6 @@ func NewRebootVMMethod() RebootVMMethod {
 	return RebootVMMethod{}
 }
 
-func (a RebootVMMethod) RebootVM(vmCID apiv1.VMCID) error {
+func (a RebootVMMethod) RebootVM(_ apiv1.VMCID) error {
 	return nil
 }

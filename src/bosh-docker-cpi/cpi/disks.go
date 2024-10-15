@@ -10,10 +10,10 @@ func NewDisks() Disks {
 	return Disks{}
 }
 
-func (d Disks) SetDiskMetadata(cid apiv1.DiskCID, meta apiv1.DiskMeta) error {
+func (d Disks) SetDiskMetadata(_ apiv1.DiskCID, _ apiv1.DiskMeta) error {
 	return nil
 }
 
-func (d Disks) ResizeDisk(cid apiv1.DiskCID, size int) error {
+func (d Disks) ResizeDisk(_ apiv1.DiskCID, _ int) error {
 	return nil
 }
