@@ -252,8 +252,7 @@ func (c Container) restartByRecreating(diskID apiv1.DiskCID, diskPath string) er
 		}
 	}
 
-	err = c.dkrClient.ContainerStart(
-		context.TODO(), c.id.AsString(), dkrtypes.ContainerStartOptions{})
+	err = c.dkrClient.ContainerStart(context.TODO(), c.id.AsString(), dkrtypes.ContainerStartOptions{})
 	if err != nil {
 		c.Delete() //nolint:errcheck
 		return bosherr.WrapError(err, "Starting container")

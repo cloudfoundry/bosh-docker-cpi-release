@@ -18,5 +18,5 @@ type NetProps struct {
 	Name   string
 	Driver string
 
-	EnableIPv6 bool `json:"enable_ipv6"` // useful for dynamic networks since they dont specify subnet
+	EnableIPv6 bool `json:"enable_ipv6"` // useful for dynamic networks since they don't specify subnet
 }
