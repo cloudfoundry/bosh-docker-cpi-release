@@ -1,0 +1,25 @@
+name: go
+on:
+  push:
+    paths:
+    - 'src/bosh-docker-cpi/**'
+  pull_request:
+    paths:
+    - 'src/bosh-docker-cpi/**'
+jobs:
+  lint_and_test:
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    name: lint and test
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: src/bosh-docker-cpi/go.mod
+    - uses: golangci/golangci-lint-action@v6
+      with:
+        working-directory: src/bosh-docker-cpi/
+    - run: go run github.com/onsi/ginkgo/ginkgo -r .
+      working-directory: src/bosh-docker-cpi/
