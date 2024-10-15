@@ -1,4 +1,4 @@
-package vm_test
+package stemcell_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestReg(t *testing.T) {
+func TestStemcell(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "vm")
+	RunSpecs(t, "Stemcell Suite")
 }
