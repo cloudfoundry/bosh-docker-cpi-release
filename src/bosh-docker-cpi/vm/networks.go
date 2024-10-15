@@ -6,12 +6,12 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
 	boshuuid "github.com/cloudfoundry/bosh-utils/uuid"
-	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
-	dkrclient "github.com/docker/docker/client"
 	dkrtypes "github.com/docker/docker/api/types"
 	dkrnet "github.com/docker/docker/api/types/network"
+	dkrclient "github.com/docker/docker/client"
 )
 
 var (

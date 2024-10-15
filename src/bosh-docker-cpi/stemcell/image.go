@@ -3,11 +3,11 @@ package stemcell
 import (
 	"context"
 
+	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
-	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
-	dkrclient "github.com/docker/docker/client"
 	dkrtypes "github.com/docker/docker/api/types"
+	dkrclient "github.com/docker/docker/client"
 )
 
 type Image struct {

@@ -3,8 +3,8 @@ package cpi
 import (
 	"strings"
 
-	bosherr "github.com/cloudfoundry/bosh-utils/errors"
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
+	bosherr "github.com/cloudfoundry/bosh-utils/errors"
 )
 
 type FactoryOpts struct {

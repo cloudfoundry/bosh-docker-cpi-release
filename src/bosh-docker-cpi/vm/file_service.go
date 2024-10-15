@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"bytes"
 	"io"
-	"io/ioutil"
 	"path/filepath"
 
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
@@ -61,7 +60,7 @@ func (s *fileService) Download(sourcePath string) ([]byte, error) {
 		return []byte{}, bosherr.WrapErrorf(err, "Reading tar header for '%s'", sourceFileName)
 	}
 
-	return ioutil.ReadAll(tarReader)
+	return io.ReadAll(tarReader)
 }
 
 func (s *fileService) Upload(destinationPath string, contents []byte) error {

@@ -1,7 +1,7 @@
 package cpi
 
 import (
-"github.com/cloudfoundry/bosh-cpi-go/apiv1"
+	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 )
 
 type Snapshots struct{}

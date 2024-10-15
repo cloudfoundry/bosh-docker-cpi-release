@@ -4,7 +4,7 @@ import (
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 )
 
-type CalculateVMCloudPropertiesMethod struct {}
+type CalculateVMCloudPropertiesMethod struct{}
 
 func NewCalculateVMCloudPropertiesMethod() CalculateVMCloudPropertiesMethod {
 	return CalculateVMCloudPropertiesMethod{}

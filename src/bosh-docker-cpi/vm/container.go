@@ -255,7 +255,7 @@ func (c Container) restartByRecreating(diskID apiv1.DiskCID, diskPath string) er
 	err = c.dkrClient.ContainerStart(
 		context.TODO(), c.id.AsString(), dkrtypes.ContainerStartOptions{})
 	if err != nil {
-		c.Delete()
+		c.Delete() //nolint:errcheck
 		return bosherr.WrapError(err, "Starting container")
 	}
 
@@ -290,7 +290,7 @@ func (Container) copyNetworks(conf dkrtypes.ContainerJSON) *dkrnet.NetworkingCon
 }
 
 // todo connectNetworks is not used
-func (c Container) connectNetworks(conf dkrtypes.ContainerJSON) error {
+func (c Container) connectNetworks(conf dkrtypes.ContainerJSON) error { //nolint:unused
 	for _, endPtConfig := range conf.NetworkSettings.Networks {
 		_, err := c.dkrClient.NetworkInspect(context.TODO(), endPtConfig.NetworkID, dkrtypes.NetworkInspectOptions{})
 		if err != nil {

@@ -201,9 +201,9 @@ func (f Factory) possiblyFindNodeWithDisk(diskID apiv1.DiskCID) (string, error) 
 func (f Factory) cleanMounts(vmProps VMProps) VMProps {
 	const unixSock = "unix://"
 
-	for i, _ := range vmProps.HostConfig.Mounts {
+	for i := range vmProps.HostConfig.Mounts {
 		// Strip off unix socker from sources for convenience of configuration
-		if strings.HasPrefix(vmProps.HostConfig.Mounts[i].Source, unixSock) {
+		if strings.HasPrefix(vmProps.HostConfig.Mounts[i].Source, unixSock) { //nolint:gosimple
 			vmProps.HostConfig.Mounts[i].Source =
 				strings.TrimPrefix(vmProps.HostConfig.Mounts[i].Source, unixSock)
 		}
