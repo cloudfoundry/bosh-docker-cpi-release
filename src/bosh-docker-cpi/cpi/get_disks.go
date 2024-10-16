@@ -14,7 +14,6 @@ func NewGetDisksMethod(vmFinder bvm.Finder) GetDisksMethod {
 	return GetDisksMethod{vmFinder}
 }
 
-func (a GetDisksMethod) GetDisks(cid apiv1.VMCID) ([]apiv1.DiskCID, error) {
-	// todo implement
+func (a GetDisksMethod) GetDisks(_ apiv1.VMCID) ([]apiv1.DiskCID, error) { // TODO implement
 	return nil, nil
 }

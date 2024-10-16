@@ -28,7 +28,6 @@ func (a CreateVMMethod) CreateVM(
 	return vmCID, err
 }
 
-
 func (a CreateVMMethod) CreateVMV2(
 	agentID apiv1.AgentID, stemcellCID apiv1.StemcellCID, cloudProps apiv1.VMCloudProps,
 	networks apiv1.Networks, diskCIDs []apiv1.DiskCID, env apiv1.VMEnv) (apiv1.VMCID, apiv1.Networks, error) {

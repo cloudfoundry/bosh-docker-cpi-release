@@ -68,7 +68,12 @@ func (f Factory) New(ctx apiv1.CallContext) (apiv1.CPI, error) {
 		return CPI{}, err
 	}
 
-	dkrClient, err := dkrclient.NewClient(opts.Host, opts.APIVersion, httpClient, nil)
+	dkrClient, err :=
+		dkrclient.NewClientWithOpts(
+			dkrclient.WithHost(opts.Host),
+			dkrclient.WithVersion(opts.APIVersion),
+			dkrclient.WithHTTPClient(httpClient),
+		)
 	if err != nil {
 		return CPI{}, err
 	}

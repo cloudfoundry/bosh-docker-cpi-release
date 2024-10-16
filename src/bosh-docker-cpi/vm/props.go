@@ -5,7 +5,7 @@ import (
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-type VMProps struct {
+type Props struct {
 	ExposedPorts []string `json:"ports"` // [6868/tcp]
 
 	// Allow all Docker options
@@ -18,5 +18,5 @@ type NetProps struct {
 	Name   string
 	Driver string
 
-	EnableIPv6 bool `json:"enable_ipv6"` // useful for dynamic networks since they dont specify subnet
+	EnableIPv6 bool `json:"enable_ipv6"` // useful for dynamic networks since they don't specify subnet
 }

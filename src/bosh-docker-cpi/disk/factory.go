@@ -4,13 +4,12 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
 	boshuuid "github.com/cloudfoundry/bosh-utils/uuid"
-	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
-	dkrclient "github.com/docker/docker/client"
 	dkrvoltypes "github.com/docker/docker/api/types/volume"
-
+	dkrclient "github.com/docker/docker/client"
 )
 
 type Factory struct {

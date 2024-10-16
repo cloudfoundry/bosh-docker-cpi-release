@@ -10,7 +10,6 @@ func NewSetVMMetadataMethod() SetVMMetadataMethod {
 	return SetVMMetadataMethod{}
 }
 
-func (a SetVMMetadataMethod) SetVMMetadata(vmCID apiv1.VMCID, meta apiv1.VMMeta) error {
-	// todo can properties be set on the container
+func (a SetVMMetadataMethod) SetVMMetadata(_ apiv1.VMCID, _ apiv1.VMMeta) error { // TODO: can properties be set on the container
 	return nil
 }

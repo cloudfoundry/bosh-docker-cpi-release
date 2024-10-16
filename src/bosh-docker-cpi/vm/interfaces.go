@@ -1,9 +1,10 @@
 package vm
 
 import (
+	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
+
 	bdisk "bosh-docker-cpi/disk"
 	bstem "bosh-docker-cpi/stemcell"
-	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 )
 
 type Creator interface {

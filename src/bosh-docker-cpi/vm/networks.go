@@ -6,12 +6,12 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
 	boshuuid "github.com/cloudfoundry/bosh-utils/uuid"
-	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
-	dkrclient "github.com/docker/docker/client"
 	dkrtypes "github.com/docker/docker/api/types"
 	dkrnet "github.com/docker/docker/api/types/network"
+	dkrclient "github.com/docker/docker/client"
 )
 
 var (
@@ -68,7 +68,7 @@ func (n Networks) Enable() (string, *dkrnet.NetworkingConfig, error) {
 		// Docker seems to add IPv4 address to the container
 		// regardless if one was requested on IPv6 interfaces; remove them.
 		// Ignore fe80:: addresses — they appear on ALL interfaces.
-		// Similarly we ignore the loopback (::1) interfaces.
+		// Similarly, we ignore the loopback (::1) interfaces.
 		networkInitBashCmd = strings.Join([]string{
 			// make sure there are no tabs
 			`for DEV in $(grep -E -v "^fe80|^0{31}1" /proc/net/if_inet6 | awk '{print $6}'); do`,

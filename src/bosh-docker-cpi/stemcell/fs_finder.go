@@ -1,8 +1,8 @@
 package stemcell
 
 import (
-	boshlog "github.com/cloudfoundry/bosh-utils/logger"
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
+	boshlog "github.com/cloudfoundry/bosh-utils/logger"
 	dkrclient "github.com/docker/docker/client"
 )
 

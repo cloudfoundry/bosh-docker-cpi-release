@@ -14,8 +14,8 @@ import (
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
 	boshsys "github.com/cloudfoundry/bosh-utils/system"
 	boshuuid "github.com/cloudfoundry/bosh-utils/uuid"
-	dkrclient "github.com/docker/docker/client"
 	dkrtypes "github.com/docker/docker/api/types"
+	dkrclient "github.com/docker/docker/client"
 )
 
 type FSImporter struct {
