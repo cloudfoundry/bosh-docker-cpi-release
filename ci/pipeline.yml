@@ -381,8 +381,8 @@ resources:
     source:
       repository: bosh/integration
       tag: latest
-      username: ((docker.username))
-      password: ((docker.password))
+      username: ((dockerhub_username))
+      password: ((dockerhub_password))
 
 resource_types:
 - name: gcs-resource
