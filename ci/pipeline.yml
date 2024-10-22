@@ -1,0 +1,392 @@
+---
+groups:
+  - name: bosh-docker-cpi-release
+    jobs:
+      - unit-test
+      - build-candidate
+      - integration-test
+      - pre-release-fan-in
+      - automatically-release-new-patch
+      - promote-candidate
+      - promote-candidate-major
+      - promote-candidate-minor
+      - promote-candidate-patch
+      - bump-golang-packages
+      - bump-deps
+
+jobs:
+  - name: unit-test
+    plan:
+      - in_parallel:
+        - {trigger: true, get: bosh-cpi-src, resource: bosh-cpi-src-in}
+        - get: ci
+        - get: ci-image
+      - task: unit-tests
+        file: ci/ci/tasks/unit-tests.yml
+        image: ci-image
+
+  - name: build-candidate
+    serial: true
+    plan:
+      - in_parallel:
+        - get: bosh-cpi-src
+          resource: bosh-cpi-src-in
+          trigger: true
+          passed:
+          - unit-test
+        - get: version-semver
+          params: {bump: patch}
+        - get: ci
+        - get: ci-image
+      - put: version-semver
+        params: {file: version-semver/number}
+      - task: build-release
+        file: ci/ci/tasks/build-candidate.yml
+        image: ci-image
+      - put: bosh-cpi-dev-artifacts
+        params: {file: candidate/*.tgz}
+
+  - name: integration-test
+    plan:
+    - get: bosh-cpi-src
+      resource: bosh-cpi-src-in
+      trigger: true
+      passed:
+      - build-candidate
+    - get: bosh-deployment
+    - get: docker-deployment
+    - get: ci
+    - get: bosh-cpi-dev-artifacts
+    - get: version-semver
+      passed:
+      - build-candidate
+    - get: stemcell
+      resource: google-ubuntu-stemcell
+    - get: ci-image
+    - task: integration-test
+      file: ci/ci/tasks/setup-director.yml
+      image: ci-image
+
+  - name: pre-release-fan-in
+    plan:
+    - get: bosh-cpi-src-in
+      trigger: true
+      passed:
+      - integration-test
+    - get: bosh-cpi-dev-artifacts
+      passed:
+      - integration-test
+
+  - name: automatically-release-new-patch
+    serial_groups: [version]
+    serial: true
+    plan:
+    - in_parallel:
+      - get: bosh-cpi-src-in
+        trigger: true
+        passed:
+        - pre-release-fan-in
+      - get: golang-release
+      - get: current-version
+        resource: release-version-semver
+      - get: patched-version
+        resource: release-version-semver
+        params:
+          bump: patch
+      - get: ci-image
+    - try:
+        task: check-for-updated-golang-package
+        file: golang-release/ci/tasks/shared/check-for-updated-golang-package.yml
+        image: ci-image
+        input_mapping:
+          input_repo: bosh-cpi-src-in
+          version: current-version
+        params:
+          PACKAGES: [golang-1-linux, golang-1-darwin]
+        on_success:
+          do:
+            - put: release-notes
+              params:
+                file: release-notes/release-notes.md
+            - put: release-version-semver
+              params:
+                file: patched-version/version
+    - try:
+        task: check-for-patched-cves
+        file: golang-release/ci/tasks/shared/check-for-patched-cves.yml
+        image: ci-image
+        input_mapping:
+          input_repo: bosh-cpi-src-in
+          version: current-version
+        params:
+          SEVERITY: CRITICAL,HIGH
+          SOURCE_PATH: src
+        on_success:
+          do:
+          - put: release-notes
+            params:
+              file: release-notes/release-notes.md
+          - put: release-version-semver
+            params:
+              file: patched-version/version
+    - task: ensure-cve-checker-succeeded
+      file: golang-release/ci/tasks/shared/ensure-cve-checker-succeeded.yml
+      image: ci-image
+      params:
+        description: |
+          Since the previous step is wrapped in a "try", this task checks that the previous step fully executed.
+
+  - name: promote-candidate
+    serial_groups: [version]
+    plan:
+      - in_parallel:
+        - get: ci
+        - get: bosh-cpi-src
+          resource: bosh-cpi-src-in
+          passed:
+          - pre-release-fan-in
+        - get: bosh-cpi-release
+          resource: bosh-cpi-dev-artifacts
+          passed:
+          - pre-release-fan-in
+        - get: release-version-semver
+          trigger: true
+        - get: release-notes
+        - get: golang-release
+        - get: ci-image
+      - task: promote
+        file: ci/ci/tasks/promote-candidate.yml
+        image: ci-image
+        params:
+          release_blobs_json_key: ((gcp_json_key))
+      - put: bosh-cpi-src-out
+        params:
+          repository: promoted/repo
+          rebase: true
+          tag_prefix: "v"
+          tag: promoted/semver_version
+      - put: github-release
+        params:
+          name: promoted/prefixed_semver_version
+          tag: promoted/prefixed_semver_version
+          body: release-notes/release-notes.md
+      - task: clear-release-notes
+        file: golang-release/ci/tasks/shared/clear-release-notes.yml
+      - put: release-notes
+        params:
+          file: release-notes/release-notes.md
+
+  - name: promote-candidate-major
+    serial_groups: [version]
+    serial: true
+    plan:
+      - in_parallel:
+        - get: bosh-cpi-src-in
+          passed:
+          - pre-release-fan-in
+        - get: bosh-cpi-dev-artifacts
+          passed:
+          - pre-release-fan-in
+      - put: release-version-semver
+        params:
+          bump: major
+
+  - name: promote-candidate-minor
+    serial_groups: [version]
+    serial: true
+    plan:
+      - in_parallel:
+        - get: bosh-cpi-src-in
+          passed:
+          - pre-release-fan-in
+        - get: bosh-cpi-dev-artifacts
+          passed:
+          - pre-release-fan-in
+      - put: release-version-semver
+        params:
+          bump: minor
+
+  - name: promote-candidate-patch
+    serial_groups: [version]
+    serial: true
+    plan:
+      - in_parallel:
+        - get: bosh-cpi-src-in
+          passed:
+          - pre-release-fan-in
+        - get: bosh-cpi-dev-artifacts
+          passed:
+          - pre-release-fan-in
+      - put: release-version-semver
+        params:
+          bump: patch
+
+  - name: bump-deps
+    plan:
+    - in_parallel:
+      - get: bosh-cpi-src-in
+      - get: golang-release
+      - get: ci
+      - get: weekly
+        trigger: true
+      - get: ci-image
+    - task: bump-deps
+      file: golang-release/ci/tasks/shared/bump-deps.yml
+      image: ci-image
+      input_mapping:
+        input_repo: bosh-cpi-src-in
+      output_mapping:
+        output_repo: bosh-cpi-src-out
+      params:
+        SOURCE_PATH: src/bosh-docker-cpi
+    - task: unit-tests
+      file: ci/ci/tasks/unit-tests.yml
+      input_mapping:
+        bosh-cpi-src: bosh-cpi-src-out
+    - put: bosh-cpi-src-out
+      params:
+        repository: bosh-cpi-src-out
+        rebase: true
+
+  - name: bump-golang-packages
+    plan:
+    - in_parallel:
+      - get: bosh-cpi-src-in
+      - get: golang-release
+        trigger: true
+      - get: ci-image
+    - task: bump-golang-packages
+      file: golang-release/ci/tasks/shared/bump-golang-package.yml
+      image: ci-image
+      input_mapping:
+        input_repo: bosh-cpi-src-in
+      output_mapping:
+        output_repo: bosh-cpi-src-out
+      params:
+        PACKAGES: [golang-1-linux, golang-1-darwin]
+        PRIVATE_YML: |
+          blobstore:
+              options:
+                credentials_source: static
+                json_key: '((gcp_json_key))'
+    - put: bosh-cpi-src-out
+      params:
+        repository: bosh-cpi-src-out
+        rebase: true
+
+resources:
+  - name: weekly
+    type: time
+    source:
+      start: 3:00 -0700
+      stop: 4:30 -0700
+      days: [ Saturday ]
+      initial_version: true
+
+  # - name: bats
+  #   type: git
+  #   source:
+  #     uri: https://github.com/cloudfoundry/bosh-acceptance-tests.git
+  #     branch: master
+
+  - name: bosh-cpi-dev-artifacts
+    type: gcs-resource
+    source:
+      json_key: ((gcp_json_key))
+      bucket:   bosh-docker-cpi-release
+      regexp:   dev-artifacts/bosh-docker-cpi-([0-9]+\.[0-9]+\.[0-9]+)\.tgz
+
+  - name: bosh-cpi-src-in
+    type: git
+    source:
+      ignore_paths:
+        - .final_builds/**/*.yml
+        - releases/**/*.yml
+        - ci/*
+      uri: https://github.com/cloudfoundry/bosh-docker-cpi-release.git
+
+  - name: bosh-cpi-src-out
+    type: git
+    source:
+      uri: git@github.com:cloudfoundry/bosh-docker-cpi-release.git
+      private_key: ((github_deploy_key_bosh-docker-cpi-release.private_key))
+      branch: master
+
+  - name: golang-release
+    type: git
+    source:
+      uri: https://github.com/cloudfoundry/bosh-package-golang-release.git
+
+  - name: bosh-deployment
+    type: git
+    source:
+      uri: https://github.com/cloudfoundry/bosh-deployment.git
+      branch: master
+
+  - name: docker-deployment
+    type: git
+    source:
+      uri: https://github.com/cppforlife/docker-deployment.git
+      branch: master
+
+  - name: ci
+    type: git
+    source:
+      branch: ci
+      paths:
+        - ci/*
+      uri: https://github.com/cloudfoundry/bosh-docker-cpi-release.git
+
+  - name: github-release
+    type: github-release
+    source:
+      owner: cloudfoundry
+      repository: bosh-docker-cpi-release
+      access_token: ((github_public_repo_token))
+
+  - name: google-ubuntu-stemcell
+    type: bosh-io-stemcell
+    source:
+      name: bosh-google-kvm-ubuntu-jammy-go_agent
+      force_regular: true
+      tarball: true
+
+  - name: release-notes
+    type: gcs-resource
+    source:
+      bucket: bosh-docker-cpi-release
+      json_key: ((gcp_json_key))
+      versioned_file: release-notes/release-notes.md
+      initial_version: "0"
+      initial_content_text: ""
+
+  - name: version-semver
+    type: semver
+    source:
+      driver: gcs
+      bucket: bosh-docker-cpi-release
+      json_key: ((gcp_json_key))
+      key: semver/current-version
+
+  - name: release-version-semver
+    type: semver
+    source:
+      driver: gcs
+      bucket: bosh-docker-cpi-release
+      json_key: ((gcp_json_key))
+      key: semver/current-release-version
+      initial_version: 0.0.13
+
+  - name: ci-image
+    type: registry-image
+    source:
+      repository: bosh/integration
+      tag: latest
+      username: ((dockerhub_username))
+      password: ((dockerhub_password))
+
+resource_types:
+- name: gcs-resource
+  type: docker-image
+  source:
+    repository: frodenas/gcs-resource

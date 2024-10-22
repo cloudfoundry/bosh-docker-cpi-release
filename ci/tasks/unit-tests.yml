@@ -1,0 +1,11 @@
+---
+platform: linux
+image_resource:
+  type: docker-image
+  source:
+    repository: boshcpi/gce-cpi-release
+inputs:
+  - name: bosh-cpi-src
+  - name: ci
+run:
+  path: ci/ci/tasks/unit-tests.sh

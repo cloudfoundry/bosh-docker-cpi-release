@@ -1,0 +1,19 @@
+---
+platform: linux
+image_resource:
+  type: docker-image
+  source:
+    repository: bosh/integration
+inputs:
+  - name: bosh-cpi-src
+  - name: bosh-deployment
+  - name: docker-deployment
+  - name: ci
+  - name: bosh-cpi-dev-artifacts
+  - name: version-semver
+  - name: stemcell
+run:
+  path: ci/ci/tasks/setup-director.sh
+params:
+  BOSH_INIT_LOG_LEVEL:            warn
+
