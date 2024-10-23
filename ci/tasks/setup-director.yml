@@ -5,7 +5,7 @@ image_resource:
   source:
     repository: bosh/integration
 inputs:
-  - name: bosh-cpi-release
+  - name: bosh-cpi-src
   - name: bosh-deployment
   - name: docker-deployment
   - name: ci

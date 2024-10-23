@@ -5,7 +5,8 @@ set -e
 
 cd ${PWD}/bosh-cpi-src/
 
-cpi_path=../bosh-cpi-dev-artifacts//bosh-cpi-src/bosh-docker-cpi-${version-semver}.tgz
+dev_version=$(cat ../bosh-cpi-dev-artifacts/version)
+cpi_path=../bosh-cpi-dev-artifacts/bosh-docker-cpi-${dev_version}.tgz
 
 
 echo "-----> Create env"

@@ -48,7 +48,8 @@ jobs:
 
   - name: integration-test
     plan:
-    - get: bosh-cpi-src-in
+    - get: bosh-cpi-src
+      resource: bosh-cpi-src-in
       trigger: true
       passed:
       - build-candidate
