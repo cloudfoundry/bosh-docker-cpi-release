@@ -9,7 +9,6 @@ import (
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
 	boshuuid "github.com/cloudfoundry/bosh-utils/uuid"
-	dkrtypes "github.com/docker/docker/api/types"
 	dkrnet "github.com/docker/docker/api/types/network"
 	dkrclient "github.com/docker/docker/client"
 )
@@ -136,13 +135,11 @@ func (n Networks) createDynamicNetwork(netProps NetProps) (string, error) {
 		return "", bosherr.Error("Expected network to specify 'name'")
 	}
 
-	createOpts := dkrtypes.NetworkCreate{
-		Driver: netProps.Driver,
-
-		CheckDuplicate: true,
-		EnableIPv6:     netProps.EnableIPv6,
-		Internal:       false,
-		Attachable:     false,
+	createOpts := dkrnet.CreateOptions{
+		Driver:     netProps.Driver,
+		EnableIPv6: &netProps.EnableIPv6,
+		Internal:   false,
+		Attachable: false,
 	}
 
 	_, err := n.dkrClient.NetworkCreate(context.TODO(), netProps.Name, createOpts)
@@ -162,13 +159,13 @@ func (n Networks) createManualNetwork(netProps NetProps, network apiv1.Network) 
 		name = network.IPWithSubnetMask() // todo better name?
 	}
 
-	createOpts := dkrtypes.NetworkCreate{
-		Driver: netProps.Driver,
+	enableIPv6 := netProps.EnableIPv6 || newIPAddr(network.IP()).IsV6()
 
-		CheckDuplicate: true,
-		EnableIPv6:     netProps.EnableIPv6 || newIPAddr(network.IP()).IsV6(),
-		Internal:       false,
-		Attachable:     false,
+	createOpts := dkrnet.CreateOptions{
+		Driver:     netProps.Driver,
+		EnableIPv6: &enableIPv6,
+		Internal:   false,
+		Attachable: false,
 
 		IPAM: &dkrnet.IPAM{
 			Driver: "default",

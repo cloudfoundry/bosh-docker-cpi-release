@@ -6,16 +6,17 @@ import (
 	"strings"
 	"time"
 
+	bdisk "bosh-docker-cpi/disk"
+
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
 	dkrtypes "github.com/docker/docker/api/types"
-	dkrfilters "github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/container"
 	dkrnet "github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/volume"
 	dkrclient "github.com/docker/docker/client"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
-
-	bdisk "bosh-docker-cpi/disk"
 )
 
 type Container struct {
@@ -63,7 +64,7 @@ func (c Container) Delete() error {
 			return err
 		}
 
-		rmOpts := dkrtypes.ContainerRemoveOptions{Force: true}
+		rmOpts := container.RemoveOptions{Force: true}
 
 		// todo handle 'device or resource busy' error?
 		err = c.dkrClient.ContainerRemove(context.TODO(), c.id.AsString(), rmOpts)
@@ -252,7 +253,7 @@ func (c Container) restartByRecreating(diskID apiv1.DiskCID, diskPath string) er
 		}
 	}
 
-	err = c.dkrClient.ContainerStart(context.TODO(), c.id.AsString(), dkrtypes.ContainerStartOptions{})
+	err = c.dkrClient.ContainerStart(context.TODO(), c.id.AsString(), container.StartOptions{})
 	if err != nil {
 		c.Delete() //nolint:errcheck
 		return bosherr.WrapError(err, "Starting container")
@@ -313,7 +314,7 @@ func (c Container) connectNetworks(conf dkrtypes.ContainerJSON) error { //nolint
 }
 
 func (c Container) findNodeWithDisk(diskID apiv1.DiskCID) (string, error) {
-	resp, err := c.dkrClient.VolumeList(context.TODO(), dkrfilters.NewArgs())
+	resp, err := c.dkrClient.VolumeList(context.TODO(), volume.ListOptions{})
 	if err != nil {
 		return "", bosherr.WrapError(err, "Listing volumes")
 	}

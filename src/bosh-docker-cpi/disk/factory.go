@@ -45,7 +45,7 @@ func (f Factory) Create(size int, vmCID *apiv1.VMCID) (Disk, error) {
 	id = "vol-" + id
 
 	// todo allow other drivers
-	opts := dkrvoltypes.VolumeCreateBody{
+	opts := dkrvoltypes.CreateOptions{
 		Name:   id,
 		Driver: "local",
 	}

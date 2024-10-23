@@ -30,7 +30,6 @@ type Network interface {
 
 	CloudProps() NetworkCloudProps
 
-	// Misc
 	IsDynamic() bool
 	IsDefaultFor(string) bool
 	IPWithSubnetMask() string

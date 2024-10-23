@@ -14,7 +14,7 @@ import (
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
 	boshsys "github.com/cloudfoundry/bosh-utils/system"
 	boshuuid "github.com/cloudfoundry/bosh-utils/uuid"
-	dkrtypes "github.com/docker/docker/api/types"
+	dkrimages "github.com/docker/docker/api/types/image"
 	dkrclient "github.com/docker/docker/client"
 )
 
@@ -67,12 +67,12 @@ func (i FSImporter) ImportFromPath(imagePath string) (Stemcell, error) {
 		return nil, bosherr.WrapErrorf(err, "Reading image archive '%s'", imagePath)
 	}
 
-	src := dkrtypes.ImageImportSource{
+	src := dkrimages.ImportSource{
 		Source:     gzipReader,
 		SourceName: "-",
 	}
 
-	opts := dkrtypes.ImageImportOptions{
+	opts := dkrimages.ImportOptions{
 		Message: "bosh",
 		Tag:     id,
 	}

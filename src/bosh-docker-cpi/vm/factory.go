@@ -4,18 +4,17 @@ import (
 	"context"
 	"strings"
 
+	bstem "bosh-docker-cpi/stemcell"
+
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
 	boshuuid "github.com/cloudfoundry/bosh-utils/uuid"
-	dkrtypes "github.com/docker/docker/api/types"
 	dkrcont "github.com/docker/docker/api/types/container"
-	dkrfilters "github.com/docker/docker/api/types/filters"
 	dkrstrslice "github.com/docker/docker/api/types/strslice"
+	"github.com/docker/docker/api/types/volume"
 	dkrclient "github.com/docker/docker/client"
 	dkrnat "github.com/docker/go-connections/nat"
-
-	bstem "bosh-docker-cpi/stemcell"
 )
 
 type Factory struct {
@@ -139,7 +138,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		}
 	}
 
-	err = f.dkrClient.ContainerStart(context.TODO(), id.AsString(), dkrtypes.ContainerStartOptions{})
+	err = f.dkrClient.ContainerStart(context.TODO(), id.AsString(), dkrcont.StartOptions{})
 	if err != nil {
 		f.cleanUpContainer(container)
 		return Container{}, bosherr.WrapError(err, "Starting container")
@@ -166,9 +165,9 @@ func (f Factory) Find(id apiv1.VMCID) (VM, error) {
 	return NewContainer(id, f.dkrClient, agentEnvService, f.logger), nil
 }
 
-func (f Factory) cleanUpContainer(container dkrcont.ContainerCreateCreatedBody) {
+func (f Factory) cleanUpContainer(container dkrcont.CreateResponse) {
 	// todo be more reselient at removal see Container#Delete()
-	rmOpts := dkrtypes.ContainerRemoveOptions{Force: true}
+	rmOpts := dkrcont.RemoveOptions{Force: true}
 
 	err := f.dkrClient.ContainerRemove(context.TODO(), container.ID, rmOpts)
 	if err != nil {
@@ -177,7 +176,7 @@ func (f Factory) cleanUpContainer(container dkrcont.ContainerCreateCreatedBody) 
 }
 
 func (f Factory) possiblyFindNodeWithDisk(diskID apiv1.DiskCID) (string, error) {
-	resp, err := f.dkrClient.VolumeList(context.TODO(), dkrfilters.NewArgs())
+	resp, err := f.dkrClient.VolumeList(context.TODO(), volume.ListOptions{})
 	if err != nil {
 		return "", bosherr.WrapError(err, "Listing volumes")
 	}

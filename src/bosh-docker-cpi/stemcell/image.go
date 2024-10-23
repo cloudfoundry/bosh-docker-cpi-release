@@ -6,7 +6,7 @@ import (
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
-	dkrtypes "github.com/docker/docker/api/types"
+	dkrimages "github.com/docker/docker/api/types/image"
 	dkrclient "github.com/docker/docker/client"
 )
 
@@ -28,7 +28,7 @@ func (s Image) Delete() error {
 	s.logger.Debug("Image", "Deleting stemcell '%s'", s.id)
 
 	// todo remove forcefully?
-	_, err := s.dkrClient.ImageRemove(context.TODO(), s.id.AsString(), dkrtypes.ImageRemoveOptions{Force: true})
+	_, err := s.dkrClient.ImageRemove(context.TODO(), s.id.AsString(), dkrimages.RemoveOptions{Force: true})
 	if err != nil {
 		return bosherr.WrapErrorf(err, "Deleting stemcell image")
 	}
