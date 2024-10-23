@@ -289,30 +289,6 @@ func (Container) copyNetworks(conf dkrtypes.ContainerJSON) *dkrnet.NetworkingCon
 	return netConfig
 }
 
-// todo connectNetworks is not used
-func (c Container) connectNetworks(conf dkrtypes.ContainerJSON) error { //nolint:unused
-	for _, endPtConfig := range conf.NetworkSettings.Networks {
-		_, err := c.dkrClient.NetworkInspect(context.TODO(), endPtConfig.NetworkID, dkrtypes.NetworkInspectOptions{})
-		if err != nil {
-			if dkrclient.IsErrNotFound(err) {
-				continue
-			}
-
-			// Bridge networks cannot be inspected
-			// todo should be fixed in swarm api?
-			return bosherr.Errorf("Did not find network '%s'", endPtConfig.NetworkID)
-		}
-
-		err = c.dkrClient.NetworkConnect(
-			context.TODO(), endPtConfig.NetworkID, c.id.AsString(), endPtConfig)
-		if err != nil {
-			return bosherr.WrapError(err, "Connecting container to network")
-		}
-	}
-
-	return nil
-}
-
 func (c Container) findNodeWithDisk(diskID apiv1.DiskCID) (string, error) {
 	resp, err := c.dkrClient.VolumeList(context.TODO(), volume.ListOptions{})
 	if err != nil {

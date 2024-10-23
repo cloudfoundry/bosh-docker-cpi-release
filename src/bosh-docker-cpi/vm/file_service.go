@@ -9,7 +9,7 @@ import (
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
-	dkrtypes "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	dkrclient "github.com/docker/docker/client"
 	"golang.org/x/net/context"
 )
@@ -73,7 +73,7 @@ func (s *fileService) Upload(destinationPath string, contents []byte) error {
 		return bosherr.WrapError(err, "Creating tar")
 	}
 
-	copyOpts := dkrtypes.CopyToContainerOptions{}
+	copyOpts := container.CopyToContainerOptions{}
 
 	err = s.dkrClient.CopyToContainer(
 		context.TODO(), s.vmCID.AsString(), filepath.Dir(destinationPath), tarReader, copyOpts)
