@@ -6,7 +6,7 @@ set -e
 cd ${PWD}/bosh-cpi-src/
 
 dev_version=$(cat ../bosh-cpi-dev-artifacts/version)
-cpi_path=../bosh-cpi-dev-artifacts/bosh-docker-cpi-${dev_version}.tgz
+cpi_path=$(realpath ../bosh-cpi-dev-artifacts/bosh-docker-cpi-${dev_version}.tgz)
 
 function generate_certs() {
   local certs_dir
