@@ -175,45 +175,43 @@ function main() {
 
   docker network create -d bridge --subnet=10.245.0.0/16 director_network
 
-  pushd ${BOSH_DEPLOYMENT_PATH:-/usr/local/bosh-deployment} > /dev/null
-      export BOSH_DIRECTOR_IP="10.245.0.11"
-      export BOSH_ENVIRONMENT="docker-director"
+  export BOSH_DIRECTOR_IP="10.245.0.11"
+  export BOSH_ENVIRONMENT="docker-director"
 
-      mkdir -p ${local_bosh_dir}
+  mkdir -p ${local_bosh_dir}
 
-      command bosh int ../bosh-deployment/bosh.yml \
-        -o ../bosh-deployment/docker/cpi.yml \
-        -o ../bosh-deployment/jumpbox-user.yml \
-        -o manifests/dev.yml \
-        -v director_name=docker \
-        -v docker_cpi_path=$cpi_path \
-        -v internal_cidr=10.245.0.0/16 \
-        -v internal_gw=10.245.0.1 \
-        -v internal_ip="${BOSH_DIRECTOR_IP}" \
-        -v docker_host="${DOCKER_HOST}" \
-        -v network=director_network \
-        -v docker_tls="{\"ca\": \"$(cat ${certs_dir}/ca_json_safe.pem)\",\"certificate\": \"$(cat ${certs_dir}/client_certificate_json_safe.pem)\",\"private_key\": \"$(cat ${certs_dir}/client_private_key_json_safe.pem)\"}" \
-        ${@} > "${local_bosh_dir}/bosh-director.yml"
+  command bosh int ../bosh-deployment/bosh.yml \
+    -o ../bosh-deployment/docker/cpi.yml \
+    -o ../bosh-deployment/jumpbox-user.yml \
+    -o manifests/dev.yml \
+    -v director_name=docker \
+    -v docker_cpi_path=$cpi_path \
+    -v internal_cidr=10.245.0.0/16 \
+    -v internal_gw=10.245.0.1 \
+    -v internal_ip="${BOSH_DIRECTOR_IP}" \
+    -v docker_host="${DOCKER_HOST}" \
+    -v network=director_network \
+    -v docker_tls="{\"ca\": \"$(cat ${certs_dir}/ca_json_safe.pem)\",\"certificate\": \"$(cat ${certs_dir}/client_certificate_json_safe.pem)\",\"private_key\": \"$(cat ${certs_dir}/client_private_key_json_safe.pem)\"}" \
+    ${@} > "${local_bosh_dir}/bosh-director.yml"
 
-      command bosh create-env "${local_bosh_dir}/bosh-director.yml" \
-              --vars-store="${local_bosh_dir}/creds.yml" \
-              --state="${local_bosh_dir}/state.json"
+  command bosh create-env "${local_bosh_dir}/bosh-director.yml" \
+          --vars-store="${local_bosh_dir}/creds.yml" \
+          --state="${local_bosh_dir}/state.json"
 
-      bosh int "${local_bosh_dir}/creds.yml" --path /director_ssl/ca > "${local_bosh_dir}/ca.crt"
-      bosh -e "${BOSH_DIRECTOR_IP}" --ca-cert "${local_bosh_dir}/ca.crt" alias-env "${BOSH_ENVIRONMENT}"
+  bosh int "${local_bosh_dir}/creds.yml" --path /director_ssl/ca > "${local_bosh_dir}/ca.crt"
+  bosh -e "${BOSH_DIRECTOR_IP}" --ca-cert "${local_bosh_dir}/ca.crt" alias-env "${BOSH_ENVIRONMENT}"
 
-      cat <<EOF > "${local_bosh_dir}/env"
-      export BOSH_ENVIRONMENT="${BOSH_ENVIRONMENT}"
-      export BOSH_CLIENT=admin
-      export BOSH_CLIENT_SECRET=`bosh int "${local_bosh_dir}/creds.yml" --path /admin_password`
-      export BOSH_CA_CERT="${local_bosh_dir}/ca.crt"
+  cat <<EOF > "${local_bosh_dir}/env"
+  export BOSH_ENVIRONMENT="${BOSH_ENVIRONMENT}"
+  export BOSH_CLIENT=admin
+  export BOSH_CLIENT_SECRET=`bosh int "${local_bosh_dir}/creds.yml" --path /admin_password`
+  export BOSH_CA_CERT="${local_bosh_dir}/ca.crt"
 
 EOF
-      source "${local_bosh_dir}/env"
 
-      bosh -n update-cloud-config docker/cloud-config.yml -v network=director_network
+  source "${local_bosh_dir}/env"
+  bosh -n update-cloud-config docker/cloud-config.yml -v network=director_network
 
-  popd > /dev/null
 }
 
 main $@

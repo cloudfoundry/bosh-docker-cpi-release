@@ -62,6 +62,7 @@ jobs:
     - get: docker-cpi-image
     - task: integration-test
       file: ci/ci/tasks/setup-director.yml
+      privileged: true
       image: docker-cpi-image
 
   - name: pre-release-fan-in
