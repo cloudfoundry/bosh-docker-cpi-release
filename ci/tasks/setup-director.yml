@@ -3,11 +3,9 @@ platform: linux
 inputs:
   - name: bosh-cpi-src
   - name: bosh-deployment
-  - name: docker-deployment
   - name: ci
   - name: bosh-cpi-dev-artifacts
   - name: version-semver
-  - name: stemcell
 run:
   path: ci/ci/tasks/setup-director.sh
 params:

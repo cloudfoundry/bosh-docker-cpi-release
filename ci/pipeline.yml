@@ -54,18 +54,16 @@ jobs:
       passed:
       - build-candidate
     - get: bosh-deployment
-    - get: docker-deployment
     - get: ci
     - get: bosh-cpi-dev-artifacts
     - get: version-semver
       passed:
       - build-candidate
-    - get: stemcell
-      resource: google-ubuntu-stemcell
-    - get: ci-image
+    - get: docker-cpi-image
     - task: integration-test
       file: ci/ci/tasks/setup-director.yml
-      image: ci-image
+      privileged: true
+      image: docker-cpi-image
 
   - name: pre-release-fan-in
     plan:
@@ -323,12 +321,6 @@ resources:
       uri: https://github.com/cloudfoundry/bosh-deployment.git
       branch: master
 
-  - name: docker-deployment
-    type: git
-    source:
-      uri: https://github.com/cppforlife/docker-deployment.git
-      branch: master
-
   - name: ci
     type: git
     source:
@@ -343,13 +335,6 @@ resources:
       owner: cloudfoundry
       repository: bosh-docker-cpi-release
       access_token: ((github_public_repo_token))
-
-  - name: google-ubuntu-stemcell
-    type: bosh-io-stemcell
-    source:
-      name: bosh-google-kvm-ubuntu-jammy-go_agent
-      force_regular: true
-      tarball: true
 
   - name: release-notes
     type: gcs-resource
@@ -373,7 +358,14 @@ resources:
       bucket: bosh-docker-cpi-release
       json_key: ((gcp_json_key))
       key: semver/current-release-version
-      initial_version: 0.0.13
+
+  - name: docker-cpi-image
+    type: registry-image
+    source:
+      repository: bosh/docker-cpi
+      tag: latest
+      username: ((dockerhub_username))
+      password: ((dockerhub_password))
 
   - name: ci-image
     type: registry-image
