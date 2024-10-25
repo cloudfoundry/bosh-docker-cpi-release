@@ -325,7 +325,6 @@ resources:
   - name: ci
     type: git
     source:
-      branch: ci
       paths:
         - ci/*
       uri: https://github.com/cloudfoundry/bosh-docker-cpi-release.git
