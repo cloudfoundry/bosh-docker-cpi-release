@@ -19,7 +19,7 @@ properties:
     example: "tcp://10.10.0.62:32768"
   docker_cpi.docker.api_version:
     description: "Expected Docker API version"
-    default: "1.41"
+    default: "1.44"
   docker_cpi.docker.tls:
     type: certificate
     description: |
