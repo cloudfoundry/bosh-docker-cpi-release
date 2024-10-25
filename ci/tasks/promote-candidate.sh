@@ -2,6 +2,8 @@
 
 set -e
 
+source ci/ci/tasks/utils.sh
+
 check_param release_blobs_json_key
 
 # Version info
