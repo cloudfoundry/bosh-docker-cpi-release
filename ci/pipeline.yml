@@ -8,9 +8,9 @@ groups:
       - pre-release-fan-in
       - automatically-release-new-patch
       - promote-candidate
-      - promote-candidate-major
-      - promote-candidate-minor
-      - promote-candidate-patch
+      - release-new-major
+      - release-new-minor
+      - release-new-patch
       - bump-golang-packages
       - bump-deps
 
@@ -175,7 +175,7 @@ jobs:
         params:
           file: release-notes/release-notes.md
 
-  - name: promote-candidate-major
+  - name: release-new-major
     serial_groups: [version]
     serial: true
     plan:
@@ -190,7 +190,7 @@ jobs:
         params:
           bump: major
 
-  - name: promote-candidate-minor
+  - name: release-new-minor
     serial_groups: [version]
     serial: true
     plan:
@@ -205,7 +205,7 @@ jobs:
         params:
           bump: minor
 
-  - name: promote-candidate-patch
+  - name: release-new-patch
     serial_groups: [version]
     serial: true
     plan:
