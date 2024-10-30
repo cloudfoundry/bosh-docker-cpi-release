@@ -156,7 +156,7 @@ func (n Networks) createManualNetwork(netProps NetProps, network apiv1.Network) 
 	name := netProps.Name
 
 	if len(name) == 0 {
-		name = network.IPWithSubnetMask() // todo better name?
+		name = network.SubnetCIDR() // todo better name?
 	}
 
 	enableIPv6 := netProps.EnableIPv6 || newIPAddr(network.IP()).IsV6()
@@ -170,7 +170,7 @@ func (n Networks) createManualNetwork(netProps NetProps, network apiv1.Network) 
 		IPAM: &dkrnet.IPAM{
 			Driver: "default",
 			Config: []dkrnet.IPAMConfig{
-				{Subnet: network.IPWithSubnetMask()},
+				{Subnet: network.SubnetCIDR()},
 			},
 		},
 	}
@@ -193,7 +193,7 @@ func (n Networks) createManualNetwork(netProps NetProps, network apiv1.Network) 
 				return "", bosherr.WrapErrorf(err,
 					"Expected network '%s' to not have subnet '%s' "+
 						"while trying to create network '%s' with the same subnet",
-					matches[1], network.IPWithSubnetMask(), netProps.Name)
+					matches[1], network.SubnetCIDR(), netProps.Name)
 			}
 
 			return matches[1], nil
