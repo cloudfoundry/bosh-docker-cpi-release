@@ -240,6 +240,7 @@ jobs:
         SOURCE_PATH: src/bosh-docker-cpi
     - task: unit-tests
       file: ci/ci/tasks/unit-tests.yml
+      image: ci-image
       input_mapping:
         bosh-cpi-src: bosh-cpi-src-out
     - put: bosh-cpi-src-out
