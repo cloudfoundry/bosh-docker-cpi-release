@@ -10,8 +10,8 @@ github.com/charlievieth/fs v0.0.3 h1:3lZQXTj4PbE81CVPwALSn+JoyCNXkZgORHN6h2XHGlg
 github.com/charlievieth/fs v0.0.3/go.mod h1:hD4sRzto1Hw8zCua76tNVKZxaeZZr1RiKftjAJQRLLo=
 github.com/cloudfoundry/bosh-cpi-go v0.0.0-20241030212755-0e796ef21b6f h1:hWq7YAeyR/Xt8uGqwW+X99JoyRSV3WjOZYf2TX1L20s=
 github.com/cloudfoundry/bosh-cpi-go v0.0.0-20241030212755-0e796ef21b6f/go.mod h1:YuyoDcYgTbf90Q4XKS+F2aKoJLqV7NDmgQlai84POSY=
-github.com/cloudfoundry/bosh-utils v0.0.500 h1:am7t3jymDRE9kjwQrDY9YzlPnx6RXPQw4OPuZxaIZuE=
-github.com/cloudfoundry/bosh-utils v0.0.500/go.mod h1:ei4cKypTn2mHQQ2fy/tD+43YAJ/IS35h/Ao+P9iR3Xc=
+github.com/cloudfoundry/bosh-utils v0.0.501 h1:D23pqBKrWr+Yn0u7eHUbC5WW4VzDL3bzC6/c/rp74tI=
+github.com/cloudfoundry/bosh-utils v0.0.501/go.mod h1:XQfX3vNAYjRqxIlzfOzwQptymhEdddO6QzDFRMBdN3U=
 github.com/containerd/log v0.1.0 h1:TCJt7ioM2cr/tfR8GPbGf9/VRAX8D2B4PjzCpfX540I=
 github.com/containerd/log v0.1.0/go.mod h1:VRRf09a7mHDIRezVKTRCrOq78v577GXq3bSa3EhrzVo=
 github.com/creack/pty v1.1.11/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
