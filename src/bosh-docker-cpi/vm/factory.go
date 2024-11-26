@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"bosh-docker-cpi/config"
 	bstem "bosh-docker-cpi/stemcell"
 
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
@@ -25,6 +26,7 @@ type Factory struct {
 
 	logTag string
 	logger boshlog.Logger
+	Config config.Config
 }
 
 func NewFactory(
@@ -32,6 +34,7 @@ func NewFactory(
 	uuidGen boshuuid.Generator,
 	agentOptions apiv1.AgentOptions,
 	logger boshlog.Logger,
+	cfg config.Config,
 ) Factory {
 	return Factory{
 		dkrClient: dkrClient,
@@ -41,6 +44,7 @@ func NewFactory(
 
 		logTag: "vm.Factory",
 		logger: logger,
+		Config: cfg,
 	}
 }
 
@@ -72,11 +76,16 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	containerConfig := &dkrcont.Config{
 		Image:        stemcell.ID().AsString(),
 		ExposedPorts: map[dkrnat.Port]struct{}{}, // todo what ports?
+		Env:          []string{"reschedule:on-node-failure"},
+	}
 
+	if f.Config.StartContainersWithSystemD {
+		containerConfig.Entrypoint = dkrstrslice.StrSlice{"sbin/init"}
+	} else {
 		// todo hacky umount to avoid conflicting with bosh dns updates
 		// todo why perms are wrong on /var/vcap/data
 		// todo dont need to create /var/vcap/store
-		Cmd: dkrstrslice.StrSlice{"bash", "-c", strings.Join([]string{
+		containerConfig.Cmd = dkrstrslice.StrSlice{"bash", "-c", strings.Join([]string{
 			`umount /etc/resolv.conf`,
 			`umount /etc/hosts`,
 			`umount /etc/hostname`,
@@ -86,9 +95,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			`mkdir -p /var/vcap/store`,
 			"sed -i 's/chronyc/# chronyc/g' /var/vcap/bosh/bin/sync-time",
 			`exec env -i /usr/sbin/runsvdir-start`,
-		}, " && ")},
-
-		Env: []string{"reschedule:on-node-failure"},
+		}, " && ")}
 	}
 
 	if len(diskCIDs) > 0 {
@@ -142,6 +149,20 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	if err != nil {
 		f.cleanUpContainer(container)
 		return Container{}, bosherr.WrapError(err, "Starting container")
+	}
+
+	if f.Config.StartContainersWithSystemD {
+		execProcess, err := f.dkrClient.ContainerExecCreate(context.TODO(), id.AsString(), dkrcont.ExecOptions{Cmd: []string{"bash", "-c", "umount /etc/hosts"}})
+		if err != nil {
+			f.cleanUpContainer(container)
+			return Container{}, bosherr.WrapError(err, "Creating exec")
+		}
+
+		err = f.dkrClient.ContainerExecStart(context.TODO(), execProcess.ID, dkrcont.ExecStartOptions{})
+		if err != nil {
+			f.cleanUpContainer(container)
+			return Container{}, bosherr.WrapError(err, "Starting exec")
+		}
 	}
 
 	agentEnv := apiv1.AgentEnvFactory{}.ForVM(agentID, id, networks, env, f.agentOptions)

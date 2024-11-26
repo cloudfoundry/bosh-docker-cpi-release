@@ -38,3 +38,6 @@ properties:
   docker_cpi.agent.blobstore.options:
     description: "Options for the blobstore used by deployed BOSH agents"
     default: {}
+  docker_cpi.start_containers_with_systemd:
+    description: "Containers will use /sbin/init as the entry point. Enabling this is required for Noble stemcells, but currently breaks all pre-Noble stemcells"
+    default: false

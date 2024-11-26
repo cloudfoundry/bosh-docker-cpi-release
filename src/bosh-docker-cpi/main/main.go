@@ -9,6 +9,7 @@ import (
 	boshsys "github.com/cloudfoundry/bosh-utils/system"
 	boshuuid "github.com/cloudfoundry/bosh-utils/uuid"
 
+	"bosh-docker-cpi/config"
 	"bosh-docker-cpi/cpi"
 )
 
@@ -22,13 +23,13 @@ func main() {
 
 	flag.Parse()
 
-	config, err := NewConfigFromPath(*configPathOpt, fs)
+	cfg, err := config.NewConfigFromPath(*configPathOpt, fs)
 	if err != nil {
-		logger.Error("main", "Loading config %s", err.Error())
+		logger.Error("main", "Loading cfg %s", err.Error())
 		os.Exit(1)
 	}
 
-	cpiFactory := cpi.NewFactory(fs, uuidGen, config.Actions, logger)
+	cpiFactory := cpi.NewFactory(fs, uuidGen, cfg.Actions, logger, cfg)
 
 	cli := rpc.NewFactory(logger).NewCLI(cpiFactory)
 
