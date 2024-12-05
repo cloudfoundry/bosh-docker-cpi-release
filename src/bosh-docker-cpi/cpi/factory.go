@@ -12,6 +12,7 @@ import (
 	dkrclient "github.com/docker/docker/client"
 	dkrtlsconfig "github.com/docker/go-connections/tlsconfig"
 
+	"bosh-docker-cpi/config"
 	bdisk "bosh-docker-cpi/disk"
 	bstem "bosh-docker-cpi/stemcell"
 	bvm "bosh-docker-cpi/vm"
@@ -20,8 +21,9 @@ import (
 type Factory struct {
 	fs      boshsys.FileSystem
 	uuidGen boshuuid.Generator
-	opts    FactoryOpts
+	opts    config.FactoryOpts
 	logger  boshlog.Logger
+	Config  config.Config
 }
 
 type CPI struct {
@@ -51,10 +53,11 @@ type CPI struct {
 func NewFactory(
 	fs boshsys.FileSystem,
 	uuidGen boshuuid.Generator,
-	opts FactoryOpts,
+	opts config.FactoryOpts,
 	logger boshlog.Logger,
+	cfg config.Config,
 ) Factory {
-	return Factory{fs, uuidGen, opts, logger}
+	return Factory{fs, uuidGen, opts, logger, cfg}
 }
 
 func (f Factory) New(ctx apiv1.CallContext) (apiv1.CPI, error) {
@@ -80,7 +83,7 @@ func (f Factory) New(ctx apiv1.CallContext) (apiv1.CPI, error) {
 
 	stemcellImporter := bstem.NewFSImporter(dkrClient, f.fs, f.uuidGen, f.logger)
 	stemcellFinder := bstem.NewFSFinder(dkrClient, f.logger)
-	vmFactory := bvm.NewFactory(dkrClient, f.uuidGen, f.opts.Agent, f.logger)
+	vmFactory := bvm.NewFactory(dkrClient, f.uuidGen, f.opts.Agent, f.logger, f.Config)
 	diskFactory := bdisk.NewFactory(dkrClient, f.uuidGen, f.logger)
 
 	return CPI{
@@ -107,18 +110,18 @@ func (f Factory) New(ctx apiv1.CallContext) (apiv1.CPI, error) {
 	}, nil
 }
 
-func (Factory) dockerOpts(ctx apiv1.CallContext, defaults DockerOpts) (DockerOpts, error) {
-	var opts DockerOpts
+func (Factory) dockerOpts(ctx apiv1.CallContext, defaults config.DockerOpts) (config.DockerOpts, error) {
+	var opts config.DockerOpts
 
 	err := ctx.As(&opts)
 	if err != nil {
-		return DockerOpts{}, bosherr.WrapError(err, "Parsing CPI context")
+		return config.DockerOpts{}, bosherr.WrapError(err, "Parsing CPI context")
 	}
 
 	if len(opts.Host) > 0 {
 		err := opts.Validate()
 		if err != nil {
-			return DockerOpts{}, bosherr.WrapError(err, "Validating CPI context")
+			return config.DockerOpts{}, bosherr.WrapError(err, "Validating CPI context")
 		}
 	} else {
 		opts = defaults
@@ -127,7 +130,7 @@ func (Factory) dockerOpts(ctx apiv1.CallContext, defaults DockerOpts) (DockerOpt
 	return opts, nil
 }
 
-func (Factory) httpClient(opts DockerOpts) (*http.Client, error) {
+func (Factory) httpClient(opts config.DockerOpts) (*http.Client, error) {
 	if !opts.RequiresTLS() {
 		return nil, nil
 	}
