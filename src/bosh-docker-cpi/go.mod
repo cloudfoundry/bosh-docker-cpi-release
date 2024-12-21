@@ -3,14 +3,14 @@ module bosh-docker-cpi
 go 1.22.0
 
 require (
-	github.com/cloudfoundry/bosh-cpi-go v0.0.0-20241207100358-4719c3273ffb
-	github.com/cloudfoundry/bosh-utils v0.0.513
-	github.com/docker/docker v27.4.0+incompatible
+	github.com/cloudfoundry/bosh-cpi-go v0.0.0-20241214100229-ac5e82eede68
+	github.com/cloudfoundry/bosh-utils v0.0.516
+	github.com/docker/docker v27.4.1+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.34.2
 	github.com/opencontainers/image-spec v1.1.0
-	golang.org/x/net v0.32.0
+	golang.org/x/net v0.33.0
 )
 
 require (
