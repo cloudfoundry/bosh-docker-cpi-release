@@ -12,7 +12,7 @@ echo "$semver_version" > promoted/semver_version
 echo "v$semver_version" > promoted/prefixed_semver_version
 echo "BOSH Docker CPI BOSH Release v${semver_version}" > promoted/annotation_message
 
-cp -r bosh-cpi-src promoted/repo
+cp -r bosh-docker-cpi-release promoted/repo
 
 dev_release=$(echo $PWD/bosh-cpi-release/*.tgz)
 

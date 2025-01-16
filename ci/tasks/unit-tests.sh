@@ -4,7 +4,7 @@ set -e
 
 source ci/ci/tasks/utils.sh
 
-check_go_version ${PWD}/bosh-cpi-src
+check_go_version ${PWD}/bosh-docker-cpi-release
 
-cd ${PWD}/bosh-cpi-src/src/bosh-docker-cpi
+cd ${PWD}/bosh-docker-cpi-release/src/bosh-docker-cpi
 go run github.com/onsi/ginkgo/v2/ginkgo -r .

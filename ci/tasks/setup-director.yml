@@ -1,7 +1,7 @@
 ---
 platform: linux
 inputs:
-  - name: bosh-cpi-src
+  - name: bosh-docker-cpi-release
   - name: bosh-deployment
   - name: ci
   - name: bosh-cpi-dev-artifacts
