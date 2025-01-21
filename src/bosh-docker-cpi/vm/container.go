@@ -19,6 +19,9 @@ import (
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+const UpdateSettingsPath = "/var/vcap/bosh/update_settings.json"
+const DnsRecordsPath = "/var/vcap/instance/dns/records.json"
+
 type Container struct {
 	id apiv1.VMCID
 
@@ -137,9 +140,14 @@ func (c Container) AttachDisk(disk bdisk.Disk) (apiv1.DiskHint, error) {
 	}
 
 	fileService := NewFileService(c.dkrClient, c.id, c.logger)
-	updateSettings, err := fileService.Download("/var/vcap/bosh/update_settings.json")
+
+	updateSettings, err := fileService.Download(UpdateSettingsPath)
 	if err != nil {
 		c.logger.Warn("attach-disk", "Unable to find update_settings.json skipping: %s", err)
+	}
+	dnsRecords, err := fileService.Download(DnsRecordsPath)
+	if err != nil {
+		c.logger.Warn("attach-disk", "Unable to find records.json skipping: %s", err)
 	}
 
 	path := filepath.Join("/warden-cpi-dev", disk.ID().AsString())
@@ -157,9 +165,15 @@ func (c Container) AttachDisk(disk bdisk.Disk) (apiv1.DiskHint, error) {
 	}
 
 	if len(updateSettings) > 0 {
-		err = fileService.Upload("/var/vcap/bosh/update_settings.json", updateSettings)
+		err = fileService.Upload(UpdateSettingsPath, updateSettings)
 		if err != nil {
 			return apiv1.DiskHint{}, bosherr.WrapError(err, "Restoring update_settings.json")
+		}
+	}
+	if len(dnsRecords) > 0 {
+		err = fileService.Upload(DnsRecordsPath, dnsRecords)
+		if err != nil {
+			return apiv1.DiskHint{}, bosherr.WrapError(err, "Restoring records.json")
 		}
 	}
 
@@ -182,9 +196,14 @@ func (c Container) DetachDisk(disk bdisk.Disk) error {
 	}
 
 	fileService := NewFileService(c.dkrClient, c.id, c.logger)
-	updateSettings, err := fileService.Download("/var/vcap/bosh/update_settings.json")
+
+	updateSettings, err := fileService.Download(UpdateSettingsPath)
 	if err != nil {
 		c.logger.Warn("detach-disk", "Unable to find update_settings.json skipping: %s", err)
+	}
+	dnsRecords, err := fileService.Download(DnsRecordsPath)
+	if err != nil {
+		c.logger.Warn("detach-disk", "Unable to find records.json skipping: %s", err)
 	}
 
 	agentEnv.DetachPersistentDisk(disk.ID())
@@ -201,9 +220,15 @@ func (c Container) DetachDisk(disk bdisk.Disk) error {
 	}
 
 	if len(updateSettings) > 0 {
-		err = fileService.Upload("/var/vcap/bosh/update_settings.json", updateSettings)
+		err = fileService.Upload(UpdateSettingsPath, updateSettings)
 		if err != nil {
 			return bosherr.WrapError(err, "Restoring update_settings.json")
+		}
+	}
+	if len(dnsRecords) > 0 {
+		err = fileService.Upload(DnsRecordsPath, dnsRecords)
+		if err != nil {
+			return bosherr.WrapError(err, "Restoring records.json")
 		}
 	}
 
