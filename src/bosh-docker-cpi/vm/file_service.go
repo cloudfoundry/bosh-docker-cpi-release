@@ -3,6 +3,7 @@ package vm
 import (
 	"archive/tar"
 	"bytes"
+	"fmt"
 	"io"
 	"path/filepath"
 
@@ -65,6 +66,7 @@ func (s *fileService) Download(sourcePath string) ([]byte, error) {
 
 func (s *fileService) Upload(destinationPath string, contents []byte) error {
 	destinationFileName := filepath.Base(destinationPath)
+	destinationDirName := filepath.Dir(destinationPath)
 
 	// Stream in settings file to a temporary directory
 	// so that tar (running as vcap) has permission to unpack into dir.
@@ -73,8 +75,12 @@ func (s *fileService) Upload(destinationPath string, contents []byte) error {
 		return bosherr.WrapError(err, "Creating tar")
 	}
 
-	copyOpts := container.CopyToContainerOptions{}
+	err = s.mkdir(destinationDirName)
+	if err != nil {
+		return bosherr.WrapError(err, "Creating directory")
+	}
 
+	copyOpts := container.CopyToContainerOptions{}
 	err = s.dkrClient.CopyToContainer(
 		context.TODO(), s.vmCID.AsString(), filepath.Dir(destinationPath), tarReader, copyOpts)
 	if err != nil {
@@ -82,6 +88,15 @@ func (s *fileService) Upload(destinationPath string, contents []byte) error {
 	}
 
 	return nil
+}
+
+func (s *fileService) mkdir(dirName string) error {
+	execProcess, err := s.dkrClient.ContainerExecCreate(context.TODO(), s.vmCID.AsString(), container.ExecOptions{Cmd: []string{"bash", "-c", fmt.Sprintf("mkdir -p %s", dirName)}})
+	if err != nil {
+		return err
+	}
+
+	return s.dkrClient.ContainerExecStart(context.TODO(), execProcess.ID, container.ExecStartOptions{})
 }
 
 func (s *fileService) tarReader(fileName string, contents []byte) (io.Reader, error) {
