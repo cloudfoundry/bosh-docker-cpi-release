@@ -267,7 +267,7 @@ resources:
     source:
       bucket: bosh-docker-cpi-release
       json_key: ((gcp_json_key))
-      regexp: release-notes/release-notes.md
+      versioned_file: release-notes/release-notes.md
 
   - name: release-version-semver
     type: semver
