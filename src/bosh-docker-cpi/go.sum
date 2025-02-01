@@ -8,10 +8,10 @@ github.com/cenkalti/backoff/v4 v4.2.1 h1:y4OZtCnogmCPw98Zjyt5a6+QwPLGkiQsYW5oUqy
 github.com/cenkalti/backoff/v4 v4.2.1/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/charlievieth/fs v0.0.3 h1:3lZQXTj4PbE81CVPwALSn+JoyCNXkZgORHN6h2XHGlg=
 github.com/charlievieth/fs v0.0.3/go.mod h1:hD4sRzto1Hw8zCua76tNVKZxaeZZr1RiKftjAJQRLLo=
-github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250118100239-79fbc012a9c2 h1:UaOaU6Tro/1apPf8BFpMcbxYdOg/r8G6j9nb5Q1Mix0=
-github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250118100239-79fbc012a9c2/go.mod h1:asdLwItQtyLmwfBGrTsDCoAP57OXhEAqBYQazrHtAos=
-github.com/cloudfoundry/bosh-utils v0.0.523 h1:S0g07iDnbm4pKAEHet6PXMbRP/AEurUjmrCeesh6+6Q=
-github.com/cloudfoundry/bosh-utils v0.0.523/go.mod h1:k2+9+gD7ATvZa+clC7fRjmQiY0I2QNWyRV2LygsCeZA=
+github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250125100203-df753f7ff73d h1:7UTEZXBkyZIuaChWyyOzzEjLYwjo2Xde0v6Gnz+ZeVI=
+github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250125100203-df753f7ff73d/go.mod h1:zO3TMGYeZOG0DZyX6/1bF3uOiktYL+Y6eyj5oSqg6Dg=
+github.com/cloudfoundry/bosh-utils v0.0.524 h1:txU6oC0Cb9UyYvzReWuBYXpS1YGt+cjM9ttl3Ftxvnk=
+github.com/cloudfoundry/bosh-utils v0.0.524/go.mod h1:TgTCOZSIVWIxcr+F7DXMTUVNSoNOtCDz1c+aSjrmzwI=
 github.com/containerd/log v0.1.0 h1:TCJt7ioM2cr/tfR8GPbGf9/VRAX8D2B4PjzCpfX540I=
 github.com/containerd/log v0.1.0/go.mod h1:VRRf09a7mHDIRezVKTRCrOq78v577GXq3bSa3EhrzVo=
 github.com/creack/pty v1.1.11/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
@@ -41,8 +41,8 @@ github.com/google/go-cmp v0.4.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/
 github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
-github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad h1:a6HEuzUHeKH6hwfN/ZoQgRgVIWFJljSWa/zetS2WTvg=
-github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad/go.mod h1:vavhavw2zAxS5dIdcRluK6cSGGPlZynqzFM8NdvU144=
+github.com/google/pprof v0.0.0-20250125003558-7fdb3d7e6fa0 h1:my2ucqBZmv+cWHIhZNSIYKzgN8EBGyHdC7zD5sASRAg=
+github.com/google/pprof v0.0.0-20250125003558-7fdb3d7e6fa0/go.mod h1:vavhavw2zAxS5dIdcRluK6cSGGPlZynqzFM8NdvU144=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 h1:YBftPWNWd4WwGqtY2yeZL2ef8rHAxPBD8KFhJpmcqms=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0/go.mod h1:YN5jB8ie0yfIUg6VvR9Kz84aCaG7AsGZnLjhHbUqwPg=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
