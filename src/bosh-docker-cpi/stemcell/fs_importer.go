@@ -75,6 +75,7 @@ func (i FSImporter) ImportFromPath(imagePath string) (Stemcell, error) {
 	opts := dkrimages.ImportOptions{
 		Message: "bosh",
 		Tag:     id,
+		Platform: "linux/amd64",
 	}
 
 	repo := "bosh.io/stemcells"
