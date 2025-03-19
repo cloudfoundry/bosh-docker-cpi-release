@@ -13,6 +13,7 @@ import (
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
 	dkrtypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	dkrcont "github.com/docker/docker/api/types/container"
 	dkrnet "github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 	dkrclient "github.com/docker/docker/client"
@@ -175,6 +176,10 @@ func (c Container) AttachDisk(disk bdisk.Disk) (apiv1.DiskHint, error) {
 		if err != nil {
 			return apiv1.DiskHint{}, bosherr.WrapError(err, "Restoring records.json")
 		}
+		err = c.runInContainer("chgrp vcap " + DnsRecordsPath)
+		if err != nil {
+			return apiv1.DiskHint{}, bosherr.WrapError(err, "chgrp records.json")
+		}
 	}
 
 	return diskHint, nil
@@ -285,6 +290,15 @@ func (c Container) restartByRecreating(diskID apiv1.DiskCID, diskPath string) er
 	}
 
 	return nil
+}
+
+func (c Container) runInContainer(cmd string) error {
+	execProcess, err := c.dkrClient.ContainerExecCreate(context.TODO(), c.id.AsString(), dkrcont.ExecOptions{Cmd: []string{"bash", "-c", cmd}})
+	if err != nil {
+		return err
+	}
+
+	return c.dkrClient.ContainerExecStart(context.TODO(), execProcess.ID, dkrcont.ExecStartOptions{})
 }
 
 func (Container) updateBinds(binds []string, diskID apiv1.DiskCID, diskPath string) []string {
