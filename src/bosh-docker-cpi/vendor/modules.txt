@@ -11,11 +11,11 @@ github.com/bmatcuk/doublestar
 # github.com/charlievieth/fs v0.0.3
 ## explicit; go 1.18
 github.com/charlievieth/fs
-# github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250308100114-dfc6856014de
+# github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250315100108-9b0e6453625b
 ## explicit; go 1.23.0
 github.com/cloudfoundry/bosh-cpi-go/apiv1
 github.com/cloudfoundry/bosh-cpi-go/rpc
-# github.com/cloudfoundry/bosh-utils v0.0.535
+# github.com/cloudfoundry/bosh-utils v0.0.536
 ## explicit; go 1.23.0
 github.com/cloudfoundry/bosh-utils/errors
 github.com/cloudfoundry/bosh-utils/logger
@@ -26,7 +26,7 @@ github.com/cloudfoundry/bosh-utils/uuid
 # github.com/distribution/reference v0.6.0
 ## explicit; go 1.20
 github.com/distribution/reference
-# github.com/docker/docker v28.0.1+incompatible
+# github.com/docker/docker v28.0.2+incompatible
 ## explicit
 github.com/docker/docker/api
 github.com/docker/docker/api/types
