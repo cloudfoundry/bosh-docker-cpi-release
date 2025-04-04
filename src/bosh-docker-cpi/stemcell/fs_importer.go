@@ -60,7 +60,7 @@ func (i FSImporter) ImportFromPath(imagePath string) (Stemcell, error) {
 		return nil, bosherr.WrapErrorf(err, "Opening image archive '%s'", imagePath)
 	}
 
-	defer file.Close()
+	defer file.Close() //nolint:errcheck
 
 	gzipReader, err := gzip.NewReader(file)
 	if err != nil {
@@ -73,8 +73,8 @@ func (i FSImporter) ImportFromPath(imagePath string) (Stemcell, error) {
 	}
 
 	opts := dkrimages.ImportOptions{
-		Message: "bosh",
-		Tag:     id,
+		Message:  "bosh",
+		Tag:      id,
 		Platform: "linux/amd64",
 	}
 
@@ -85,7 +85,7 @@ func (i FSImporter) ImportFromPath(imagePath string) (Stemcell, error) {
 		return nil, bosherr.WrapErrorf(err, "Starting image import")
 	}
 
-	defer responseBody.Close()
+	defer responseBody.Close() //nolint:errcheck
 
 	i.logger.Debug(i.logTag, "Waiting for import to finish")
 

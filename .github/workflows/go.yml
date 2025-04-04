@@ -7,11 +7,10 @@ on:
     paths:
     - 'src/bosh-docker-cpi/**'
 jobs:
-  lint_and_test:
+  lint: # <- name
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest]
-    name: lint and test
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
@@ -21,5 +20,16 @@ jobs:
     - uses: golangci/golangci-lint-action@v7
       with:
         working-directory: src/bosh-docker-cpi/
+
+  test-unit: # <- name
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: src/bosh-docker-cpi/go.mod
     - run: go run github.com/onsi/ginkgo/v2/ginkgo -r .
       working-directory: src/bosh-docker-cpi/
