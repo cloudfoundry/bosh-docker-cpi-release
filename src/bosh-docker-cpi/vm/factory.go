@@ -111,8 +111,8 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		}
 	}
 
-	vmProps.HostConfig.Privileged = true
-	vmProps.HostConfig.PublishAllPorts = true
+	vmProps.HostConfig.Privileged = true      //nolint:staticcheck
+	vmProps.HostConfig.PublishAllPorts = true //nolint:staticcheck
 
 	for _, port := range vmProps.ExposedPorts {
 		containerConfig.ExposedPorts[dkrnat.Port(port)] = struct{}{}
@@ -120,14 +120,14 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 
 	vmProps = f.cleanMounts(vmProps)
 
-	vmProps.HostConfig.Binds = []string{EphemeralDiskCID{id}.AsString() + ":/var/vcap/data/"}
+	vmProps.HostConfig.Binds = []string{EphemeralDiskCID{id}.AsString() + ":/var/vcap/data/"} //nolint:staticcheck
 
 	f.logger.Debug(f.logTag, "Creating container %#v, host %#v", containerConfig, &vmProps.HostConfig)
 
 	netConfig, additionalEndPtConfigs := splitNetworkSettings(netConfig)
 
-	vmProps.Platform.OS = "linux"
-	vmProps.Platform.Architecture = "amd64"
+	vmProps.Platform.OS = "linux"           //nolint:staticcheck
+	vmProps.Platform.Architecture = "amd64" //nolint:staticcheck
 
 	container, err := f.dkrClient.ContainerCreate(
 		context.TODO(), containerConfig, &vmProps.HostConfig, netConfig, &vmProps.Platform, id.AsString())
@@ -221,9 +221,9 @@ func (f Factory) possiblyFindNodeWithDisk(diskID apiv1.DiskCID) (string, error) 
 func (f Factory) cleanMounts(vmProps Props) Props {
 	const unixSock = "unix://"
 
-	for i := range vmProps.HostConfig.Mounts {
-		// Strip off unix socker from sources for convenience of configuration
-		if strings.HasPrefix(vmProps.HostConfig.Mounts[i].Source, unixSock) { //nolint:gosimple
+	for i := range vmProps.HostConfig.Mounts { //nolint:staticcheck
+		// Strip off unix socket from sources for convenience of configuration
+		if strings.HasPrefix(vmProps.HostConfig.Mounts[i].Source, unixSock) { //nolint:gosimple,staticcheck
 			vmProps.HostConfig.Mounts[i].Source =
 				strings.TrimPrefix(vmProps.HostConfig.Mounts[i].Source, unixSock)
 		}

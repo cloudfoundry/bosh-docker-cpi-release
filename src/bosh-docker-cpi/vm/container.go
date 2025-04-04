@@ -13,7 +13,6 @@ import (
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
 	dkrtypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	dkrcont "github.com/docker/docker/api/types/container"
 	dkrnet "github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 	dkrclient "github.com/docker/docker/client"
@@ -293,12 +292,12 @@ func (c Container) restartByRecreating(diskID apiv1.DiskCID, diskPath string) er
 }
 
 func (c Container) runInContainer(cmd string) error {
-	execProcess, err := c.dkrClient.ContainerExecCreate(context.TODO(), c.id.AsString(), dkrcont.ExecOptions{Cmd: []string{"bash", "-c", cmd}})
+	execProcess, err := c.dkrClient.ContainerExecCreate(context.TODO(), c.id.AsString(), container.ExecOptions{Cmd: []string{"bash", "-c", cmd}})
 	if err != nil {
 		return err
 	}
 
-	return c.dkrClient.ContainerExecStart(context.TODO(), execProcess.ID, dkrcont.ExecStartOptions{})
+	return c.dkrClient.ContainerExecStart(context.TODO(), execProcess.ID, container.ExecStartOptions{})
 }
 
 func (Container) updateBinds(binds []string, diskID apiv1.DiskCID, diskPath string) []string {
@@ -316,7 +315,7 @@ func (Container) updateBinds(binds []string, diskID apiv1.DiskCID, diskPath stri
 	return binds
 }
 
-func (Container) copyNetworks(conf dkrtypes.ContainerJSON) *dkrnet.NetworkingConfig {
+func (Container) copyNetworks(conf dkrtypes.ContainerJSON) *dkrnet.NetworkingConfig { //nolint:staticcheck
 	netConfig := &dkrnet.NetworkingConfig{
 		EndpointsConfig: map[string]*dkrnet.EndpointSettings{},
 	}

@@ -52,7 +52,7 @@ func (s *fileService) Download(sourcePath string) ([]byte, error) {
 		return nil, bosherr.WrapError(err, "Copying from container")
 	}
 
-	defer readCloser.Close()
+	defer readCloser.Close() //nolint:errcheck
 
 	tarReader := tar.NewReader(readCloser)
 
