@@ -8,8 +8,8 @@ github.com/cenkalti/backoff/v4 v4.2.1 h1:y4OZtCnogmCPw98Zjyt5a6+QwPLGkiQsYW5oUqy
 github.com/cenkalti/backoff/v4 v4.2.1/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/charlievieth/fs v0.0.3 h1:3lZQXTj4PbE81CVPwALSn+JoyCNXkZgORHN6h2XHGlg=
 github.com/charlievieth/fs v0.0.3/go.mod h1:hD4sRzto1Hw8zCua76tNVKZxaeZZr1RiKftjAJQRLLo=
-github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250322100513-99658d44409c h1:wIQgzZoybveU9Sm4+h6GK3i1u2Hq9M8Y7r6MEhwfRy0=
-github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250322100513-99658d44409c/go.mod h1:lIpT3SLFgH5YUs6PKScn+Oc6tB+Ijsn2mticUbD/W0M=
+github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250329100210-9b91e4af8dca h1:8Kvx0kd/pjmwO5Io+XTmWPUE0j1MLDJVee+sTg7WNjI=
+github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250329100210-9b91e4af8dca/go.mod h1:zeym7ObRKyIx/bIdPW8rIBPBxGJzo69wY+cZMfNjJ28=
 github.com/cloudfoundry/bosh-utils v0.0.538 h1:5J99nCN0NynRK9lUcIAXeswW4pv2bkhyLLevajjHb/s=
 github.com/cloudfoundry/bosh-utils v0.0.538/go.mod h1:ohCt2Llxkj8/sgG3zipUhpHdB2bYgwCcFTzkkRNDpo8=
 github.com/containerd/log v0.1.0 h1:TCJt7ioM2cr/tfR8GPbGf9/VRAX8D2B4PjzCpfX540I=
