@@ -3,9 +3,11 @@ on:
   push:
     paths:
     - 'src/bosh-docker-cpi/**'
+    - '.github/**'
   pull_request:
     paths:
     - 'src/bosh-docker-cpi/**'
+    - '.github/**'
 jobs:
   lint: # <- name
     strategy:
