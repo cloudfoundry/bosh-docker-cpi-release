@@ -1,0 +1,26 @@
+---
+# Fix blobstore URL to include the scheme (https://)
+# This addresses the issue where blobstore endpoint is missing the URL scheme
+
+# Fix the main blobstore endpoint
+- type: replace
+  path: /instance_groups/name=bosh/properties/blobstore/address?
+  value: https://10.245.0.11:25250
+
+# Also fix any agent blobstore configuration
+- type: replace
+  path: /instance_groups/name=bosh/properties/agent/env/bosh/blobstores?/-
+  value:
+    provider: dav
+    options:
+      endpoint: https://10.245.0.11:25250
+      user: agent
+      password: ((blobstore_agent_password))
+      tls:
+        cert:
+          ca: ((blobstore_ca.certificate))
+
+# Fix docker_cpi agent configuration
+- type: replace
+  path: /instance_groups/name=bosh/properties/docker_cpi/agent/blobstore/options/endpoint?
+  value: https://10.245.0.11:25250

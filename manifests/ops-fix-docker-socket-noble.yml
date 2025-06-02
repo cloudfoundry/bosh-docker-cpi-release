@@ -1,0 +1,28 @@
+---
+# Fix Docker socket mount path for Noble stemcells
+# Noble's BOSH agent needs to create /var/vcap/sys as a symlink to /var/vcap/data/sys
+# So we can't mount the Docker socket under /var/vcap/sys
+# We keep using /docker.sock as the stable mount point to avoid conflicts
+
+# Keep the stable mount point but ensure it's correctly configured
+- type: replace
+  path: /resource_pools/name=vms/cloud_properties/Binds
+  value:
+    - /var/run/docker.sock:/docker.sock
+
+# Also update env_pooled cloud properties if it exists
+- type: replace
+  path: /resource_pools/name=vms/env_pooled_cloud_properties?/Binds?
+  value:
+    - /var/run/docker.sock:/docker.sock
+
+# Update cloud provider CPI to use the stable socket path
+- type: replace
+  path: /cloud_provider/properties/docker?
+  value:
+    host: unix:///docker.sock
+
+# Also update the director's CPI configuration
+- type: replace
+  path: /instance_groups/name=bosh/properties/docker_cpi/docker/host?
+  value: unix:///docker.sock

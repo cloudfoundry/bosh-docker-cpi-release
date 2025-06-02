@@ -5,7 +5,7 @@ result=0
 bin=$(dirname $0)
 
 echo -e "\n Formatting packages..."
-go fmt github.com/cppforlife/bosh-docker-cpi/...
+go fmt bosh-docker-cpi/...
 let "result+=$?"
 
 echo -e "\n Testing packages..."

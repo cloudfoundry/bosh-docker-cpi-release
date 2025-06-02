@@ -1,0 +1,78 @@
+# Docker BPM Compatibility Ops File
+# This ops file adds BPM privileged mode properties for Docker compatibility
+# It works by adding the properties that BPM job templates check for
+
+# Add BPM privileged properties to all major BOSH jobs
+# These properties are used by job templates to generate bpm.yml with unsafe.privileged=true
+
+# NATS - Enable privileged mode for NATS processes
+- type: replace
+  path: /instance_groups/name=bosh/jobs/name=nats/properties?/nats?/bpm?/privileged?
+  value: true
+
+# PostgreSQL - Enable privileged mode for database processes  
+- type: replace
+  path: /instance_groups/name=bosh/jobs/name=postgres/properties?/postgres?/bpm?/privileged?
+  value: true
+
+# BOSH Director - Enable privileged mode for director processes
+- type: replace
+  path: /instance_groups/name=bosh/jobs/name=director/properties?/director?/bpm?/privileged?
+  value: true
+
+# Health Monitor - Enable privileged mode for health monitor
+- type: replace
+  path: /instance_groups/name=bosh/jobs/name=health_monitor/properties?/health_monitor?/bpm?/privileged?
+  value: true
+
+# Blobstore - Enable privileged mode for blobstore nginx
+- type: replace
+  path: /instance_groups/name=bosh/jobs/name=blobstore/properties?/blobstore?/bpm?/privileged?
+  value: true
+
+# Alternative approach: Add global BPM Docker compatibility flag
+- type: replace
+  path: /instance_groups/name=bosh/properties?/bpm?/docker_compatibility?
+  value: true
+
+# Alternative approach: Override individual process security settings
+- type: replace
+  path: /instance_groups/name=bosh/properties?/docker_cpi?/bpm_privileged_mode?
+  value: true
+
+# The variables already exist in base bosh.yml, just ensure NATS TLS properties are set
+- type: replace
+  path: /instance_groups/name=bosh/jobs/name=nats/properties?/nats?/tls?
+  value:
+    ca: ((nats_server_tls.ca))
+    client_ca:
+      certificate: ((nats_ca.certificate))
+      private_key: ((nats_ca.private_key))
+    server:
+      certificate: ((nats_server_tls.certificate))
+      private_key: ((nats_server_tls.private_key))
+    director:
+      certificate: ((nats_clients_director_tls.certificate))
+      private_key: ((nats_clients_director_tls.private_key))
+    health_monitor:
+      certificate: ((nats_clients_health_monitor_tls.certificate))
+      private_key: ((nats_clients_health_monitor_tls.private_key))
+
+# Add missing director address property for NATS sync
+- type: replace
+  path: /instance_groups/name=bosh/jobs/name=nats/properties?/director?/address?
+  value: 10.245.0.11
+
+# Add missing postgres password property
+- type: replace
+  path: /instance_groups/name=bosh/jobs/name=postgres/properties?/postgres?/password?
+  value: ((postgres_password))
+
+# Add missing blobstore TLS properties
+- type: replace
+  path: /instance_groups/name=bosh/jobs/name=blobstore/properties?/blobstore?/tls?
+  value:
+    cert:
+      ca: ((blobstore_ca.ca))
+      certificate: ((blobstore_server_tls.certificate))
+      private_key: ((blobstore_server_tls.private_key))

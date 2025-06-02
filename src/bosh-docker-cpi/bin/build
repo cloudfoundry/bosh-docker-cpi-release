@@ -4,4 +4,4 @@ set -e
 
 bin=$(dirname $0)
 
-go build -o $bin/cpi github.com/cloudfoundry/bosh-docker-cpi/main
+go build -o $bin/cpi bosh-docker-cpi/main

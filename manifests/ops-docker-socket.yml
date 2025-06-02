@@ -1,0 +1,23 @@
+---
+# Ops file to mount Docker socket into BOSH director container
+# This is required when running BOSH-on-Docker with Docker CPI
+
+# Add Docker socket bind mount to cloud properties for BOSH director VM
+- type: replace
+  path: /resource_pools/name=vms/cloud_properties/Binds?
+  value:
+    - /var/run/docker.sock:/var/run/docker.sock
+    - /var/run/docker.sock:/var/vcap/sys/run/docker.sock
+
+# Also add to env_pooled cloud properties if it exists
+- type: replace
+  path: /resource_pools/name=vms/env_pooled_cloud_properties?/Binds?
+  value:
+    - /var/run/docker.sock:/var/run/docker.sock
+    - /var/run/docker.sock:/var/vcap/sys/run/docker.sock
+
+# Configure CPI to use the alternative socket path
+- type: replace
+  path: /cloud_provider/properties/docker?
+  value:
+    host: unix:///var/vcap/sys/run/docker.sock

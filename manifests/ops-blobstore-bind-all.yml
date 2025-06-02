@@ -1,0 +1,27 @@
+---
+# Configure BOSH Director's blobstore to listen on all interfaces (0.0.0.0)
+# This is needed in Docker environments where containers may connect from different network paths
+# But ensures the director advertises the correct IP that matches the TLS certificate
+
+# Configure nginx to bind to all interfaces
+- type: replace
+  path: /instance_groups/name=bosh/properties/blobstore/director?/user?
+  value: director
+
+- type: replace
+  path: /instance_groups/name=bosh/properties/blobstore/director/password?
+  value: ((blobstore_director_password))
+
+- type: replace
+  path: /instance_groups/name=bosh/properties/blobstore/nginx?/listen_addr?
+  value: 0.0.0.0
+
+# But ensure the director advertises the correct address for clients
+- type: replace
+  path: /instance_groups/name=bosh/properties/blobstore/address
+  value: ((internal_ip))
+
+# Ensure agent still connects to the specific IP
+- type: replace
+  path: /instance_groups/name=bosh/properties/agent/env/bosh/blobstores/0/options/endpoint
+  value: https://((internal_ip)):25250

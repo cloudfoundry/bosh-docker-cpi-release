@@ -1,0 +1,40 @@
+---
+# Alternative ops file for Docker socket permissions
+# This makes the Docker socket world-writable (666) to avoid permission issues
+# WARNING: This is less secure than using proper group permissions
+# Use only in development environments
+
+# Add User to run container as root
+- type: replace
+  path: /resource_pools/name=vms/cloud_properties/User?
+  value: "0"
+
+# Ensure privileged mode is enabled
+- type: replace
+  path: /resource_pools/name=vms/cloud_properties/Privileged?
+  value: true
+
+# Add security opts to disable apparmor/seccomp restrictions
+- type: replace
+  path: /resource_pools/name=vms/cloud_properties/SecurityOpt?
+  value:
+    - apparmor:unconfined
+    - seccomp:unconfined
+
+# Add entrypoint to fix Docker socket permissions on container start
+# This ensures the socket is accessible by all users inside the container
+- type: replace
+  path: /resource_pools/name=vms/cloud_properties/Entrypoint?
+  value:
+    - /bin/sh
+    - -c
+    - |
+      # Fix Docker socket permissions if it exists
+      if [ -S /docker.sock ]; then
+        chmod 666 /docker.sock
+      fi
+      if [ -S /var/vcap/sys/run/docker.sock ]; then
+        chmod 666 /var/vcap/sys/run/docker.sock
+      fi
+      # Continue with normal init
+      exec /sbin/init

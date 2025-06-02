@@ -1,0 +1,5 @@
+---
+name: golang-1-darwin
+
+files:
+- golang-1-darwin/go*.tar.gz

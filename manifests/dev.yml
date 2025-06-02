@@ -1,6 +1,8 @@
+# Use our local development release instead of the remote one
+# This replaces the bosh-docker-cpi release added by bosh-lite-docker.yml
 - type: replace
-  path: /releases/name=bosh-docker-cpi/url
+  path: /releases/name=bosh-docker-cpi/url?
   value: file://((docker_cpi_path))
 
 - type: remove
-  path: /releases/name=bosh-docker-cpi/sha1
+  path: /releases/name=bosh-docker-cpi/sha1?

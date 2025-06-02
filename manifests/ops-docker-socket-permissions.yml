@@ -1,0 +1,8 @@
+---
+# Ops file to fix Docker socket permissions in BOSH director container
+# This runs the container in privileged mode to allow access to Docker socket
+
+# Run the container in privileged mode
+- type: replace
+  path: /resource_pools/name=vms/cloud_properties/Privileged?
+  value: true

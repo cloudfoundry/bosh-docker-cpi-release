@@ -1,8 +1,12 @@
 package cpi
 
 import (
+	"context"
 	"crypto/tls"
 	"net/http"
+	"os"
+	"strings"
+	"time"
 
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
@@ -71,12 +75,8 @@ func (f Factory) New(ctx apiv1.CallContext) (apiv1.CPI, error) {
 		return CPI{}, err
 	}
 
-	dkrClient, err :=
-		dkrclient.NewClientWithOpts(
-			dkrclient.WithHost(opts.Host),
-			dkrclient.WithVersion(opts.APIVersion),
-			dkrclient.WithHTTPClient(httpClient),
-		)
+	// Try to create Docker client with fallback mechanism
+	dkrClient, err := f.createDockerClientWithFallback(opts, httpClient)
 	if err != nil {
 		return CPI{}, err
 	}
@@ -162,4 +162,124 @@ func (Factory) httpClient(opts config.DockerOpts) (*http.Client, error) {
 	}
 
 	return client, nil
+}
+
+func (f Factory) createDockerClientWithFallback(opts config.DockerOpts, httpClient *http.Client) (*dkrclient.Client, error) {
+	f.logger.Debug("Factory", "Attempting to create Docker client with host: %s", opts.Host)
+	
+	// First, try with the configured host
+	dkrClient, err := dkrclient.NewClientWithOpts(
+		dkrclient.WithHost(opts.Host),
+		dkrclient.WithVersion(opts.APIVersion),
+		dkrclient.WithHTTPClient(httpClient),
+	)
+	if err == nil {
+		// Test the connection
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		
+		_, pingErr := dkrClient.Ping(ctx)
+		if pingErr == nil {
+			f.logger.Debug("Factory", "Successfully connected to Docker at %s", opts.Host)
+			return dkrClient, nil
+		}
+		f.logger.Debug("Factory", "Failed to ping Docker at %s: %s", opts.Host, pingErr)
+	}
+	
+	// If the original host is a unix socket and failed, try alternative socket paths
+	if strings.HasPrefix(opts.Host, "unix://") {
+		socketPaths := []string{
+			opts.Host, // Original path
+			"unix:///var/run/docker.sock", // Standard Docker socket
+			"unix:///docker.sock", // Alternative path used in some container setups
+			"unix:///var/vcap/sys/run/docker.sock", // BOSH-specific path
+		}
+		
+		// Also check if DOCKER_HOST env var is set
+		if envHost := os.Getenv("DOCKER_HOST"); envHost != "" && !contains(socketPaths, envHost) {
+			socketPaths = append(socketPaths, envHost)
+		}
+		
+		for _, socketPath := range socketPaths {
+			if socketPath == opts.Host {
+				continue // Skip the original path we already tried
+			}
+			
+			f.logger.Debug("Factory", "Trying alternative Docker socket: %s", socketPath)
+			
+			// For unix sockets, we don't use TLS
+			var altHttpClient *http.Client
+			if strings.HasPrefix(socketPath, "unix://") {
+				altHttpClient = nil
+			} else {
+				altHttpClient = httpClient
+			}
+			
+			altClient, altErr := dkrclient.NewClientWithOpts(
+				dkrclient.WithHost(socketPath),
+				dkrclient.WithVersion(opts.APIVersion),
+				dkrclient.WithHTTPClient(altHttpClient),
+			)
+			if altErr != nil {
+				f.logger.Debug("Factory", "Failed to create client for %s: %s", socketPath, altErr)
+				continue
+			}
+			
+			// Test the connection
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			
+			_, pingErr := altClient.Ping(ctx)
+			if pingErr == nil {
+				f.logger.Info("Factory", "Successfully connected to Docker at %s (fallback from %s)", socketPath, opts.Host)
+				return altClient, nil
+			}
+			f.logger.Debug("Factory", "Failed to ping Docker at %s: %s", socketPath, pingErr)
+		}
+	}
+	
+	// If we're using TCP and it failed, check if we should try unix socket as fallback
+	if strings.HasPrefix(opts.Host, "tcp://") || strings.HasPrefix(opts.Host, "http://") {
+		// Try common unix socket paths as fallback
+		unixPaths := []string{
+			"unix:///var/run/docker.sock",
+			"unix:///docker.sock",
+			"unix:///var/vcap/sys/run/docker.sock",
+		}
+		
+		for _, socketPath := range unixPaths {
+			f.logger.Debug("Factory", "Trying unix socket fallback: %s", socketPath)
+			
+			altClient, altErr := dkrclient.NewClientWithOpts(
+				dkrclient.WithHost(socketPath),
+				dkrclient.WithVersion(opts.APIVersion),
+				dkrclient.WithHTTPClient(nil), // No TLS for unix sockets
+			)
+			if altErr != nil {
+				continue
+			}
+			
+			// Test the connection
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			
+			_, pingErr := altClient.Ping(ctx)
+			if pingErr == nil {
+				f.logger.Info("Factory", "Successfully connected to Docker at %s (fallback from %s)", socketPath, opts.Host)
+				return altClient, nil
+			}
+		}
+	}
+	
+	// All attempts failed, return the original error
+	return nil, bosherr.WrapErrorf(err, "Failed to connect to Docker at %s and all fallback attempts failed", opts.Host)
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }

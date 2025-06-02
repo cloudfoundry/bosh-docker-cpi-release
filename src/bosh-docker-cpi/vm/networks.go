@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
@@ -25,9 +26,10 @@ var (
 )
 
 type Networks struct {
-	dkrClient *dkrclient.Client
-	uuidGen   boshuuid.Generator
-	networks  apiv1.Networks
+	dkrClient       *dkrclient.Client
+	uuidGen         boshuuid.Generator
+	networks        apiv1.Networks
+	isDockerDesktop bool
 }
 
 func NewNetworks(
@@ -35,13 +37,17 @@ func NewNetworks(
 	uuidGen boshuuid.Generator,
 	networks apiv1.Networks,
 ) Networks {
-	return Networks{dkrClient, uuidGen, networks}
+	isDockerDesktop := detectDockerDesktop(dkrClient)
+	return Networks{dkrClient, uuidGen, networks, isDockerDesktop}
 }
 
 func (n Networks) Enable() (string, *dkrnet.NetworkingConfig, error) {
 	if len(n.networks) == 0 {
 		return "", nil, bosherr.Error("Expected exactly one network; received zero")
 	}
+
+	// For Docker Desktop, we'll use bridge networking but with special port handling
+	// This maintains IP assignment compatibility while fixing connectivity
 
 	var netConfigPairs []netConfigPair
 	onlyHasIPv6Networks := true
@@ -203,4 +209,32 @@ func (n Networks) createManualNetwork(netProps NetProps, network apiv1.Network) 
 	}
 
 	return name, nil
+}
+
+// detectDockerDesktop checks if we're running on Docker Desktop
+// which has network isolation issues on macOS/Windows
+func detectDockerDesktop(dkrClient *dkrclient.Client) bool {
+	// Check if we're on macOS or Windows first
+	if runtime.GOOS != "darwin" && runtime.GOOS != "windows" {
+		return false
+	}
+
+	// Try to get Docker info to detect Docker Desktop
+	ctx, cancel := ContextWithTimeout(ShortDockerTimeout)
+	defer cancel()
+
+	info, err := dkrClient.Info(ctx)
+	if err != nil {
+		// If we can't get info, assume not Docker Desktop
+		return false
+	}
+
+	// Check for Docker Desktop indicators
+	return strings.Contains(strings.ToLower(info.OperatingSystem), "docker desktop") ||
+		strings.Contains(strings.ToLower(info.KernelVersion), "linuxkit")
+}
+
+// isDockerDesktopEnabled returns whether we detected Docker Desktop
+func (n Networks) IsDockerDesktop() bool {
+	return n.isDockerDesktop
 }

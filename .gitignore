@@ -17,6 +17,7 @@ blobs
 
 .vagrant/
 tmp
+tests/tmp/
 
 bat.spec
 
@@ -29,3 +30,5 @@ bat.spec
 *\.test
 *.coverprofile
 *.sublime-workspace
+*.log
+tests/logs/

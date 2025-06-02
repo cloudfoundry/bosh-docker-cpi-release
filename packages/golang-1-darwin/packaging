@@ -1,0 +1,11 @@
+set -e
+
+tar xzf golang-1-darwin/go*.tar.gz
+
+cp -R go/* ${BOSH_INSTALL_TARGET}
+
+mkdir ${BOSH_INSTALL_TARGET}/bosh
+cat <<EOF > ${BOSH_INSTALL_TARGET}/bosh/compile.env
+export GOROOT=${BOSH_INSTALL_TARGET}
+export PATH=\${GOROOT}/bin:\${PATH}
+EOF
