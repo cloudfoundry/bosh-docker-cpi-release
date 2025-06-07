@@ -50,44 +50,180 @@ EOF
   popd > /dev/null
 }
 
-function sanitize_cgroups() {
-  mkdir -p /sys/fs/cgroup
-  mountpoint -q /sys/fs/cgroup || \
-    mount -t tmpfs -o uid=0,gid=0,mode=0755 cgroup /sys/fs/cgroup
-
-  mount -o remount,rw /sys/fs/cgroup
-
-  sed -e 1d /proc/cgroups | while read sys hierarchy num enabled; do
-    if [ "$enabled" != "1" ]; then
-      # subsystem disabled; skip
-      continue
+function check_systemd_compatibility() {
+  # Check if systemd is available and get version
+  if command -v systemctl >/dev/null 2>&1; then
+    local systemd_version=$(systemctl --version | head -1 | awk '{print $2}')
+    echo "SystemD version: $systemd_version"
+    
+    # Check if version is compatible (244+ recommended for full cgroupsv2)
+    if [ -n "$systemd_version" ] && [ "$systemd_version" -ge 244 ]; then
+      echo "✓ SystemD version $systemd_version is fully compatible with cgroupsv2"
+    elif [ -n "$systemd_version" ] && [ "$systemd_version" -ge 232 ]; then
+      echo "⚠ SystemD version $systemd_version has basic cgroupsv2 support (244+ recommended)"
+    else
+      echo "⚠ SystemD version $systemd_version may have limited cgroupsv2 support"
     fi
+  else
+    echo "⚠ SystemD not detected - containers will use alternative init system"
+  fi
+}
 
-    grouping="$(cat /proc/self/cgroup | cut -d: -f2 | grep "\\<$sys\\>")"
-    if [ -z "$grouping" ]; then
-      # subsystem not mounted anywhere; mount it on its own
-      grouping="$sys"
-    fi
-
-    mountpoint="/sys/fs/cgroup/$grouping"
-
-    mkdir -p "$mountpoint"
-
-    # clear out existing mount to make sure new one is read-write
-    if mountpoint -q "$mountpoint"; then
-      umount "$mountpoint"
-    fi
-
-    mount -n -t cgroup -o "$grouping" cgroup "$mountpoint"
-
-    if [ "$grouping" != "$sys" ]; then
-      if [ -L "/sys/fs/cgroup/$sys" ]; then
-        rm "/sys/fs/cgroup/$sys"
+function setup_cgroups_v2() {
+  local retry_count=0
+  local max_retries=3
+  
+  # Check systemd compatibility first
+  check_systemd_compatibility
+  
+  # Check if cgroupsv2 is available
+  if [ ! -f /sys/fs/cgroup/cgroup.controllers ]; then
+    echo "ERROR: cgroupsv2 not available. Please enable cgroupsv2 on the host system."
+    echo "Required: Linux kernel 4.15+ with cgroupsv2 enabled"
+    echo ""
+    echo "Troubleshooting steps:"
+    echo "1. Check kernel version: uname -r (should be 4.15+)"
+    echo "2. Check kernel cmdline: cat /proc/cmdline"
+    echo "3. Add 'systemd.unified_cgroup_hierarchy=1' to kernel parameters"
+    echo "4. Verify with: stat -fc %T /sys/fs/cgroup (should show 'cgroup2fs')"
+    exit 1
+  fi
+  
+  # Ensure cgroup mount point exists (usually handled by systemd)
+  if ! mountpoint -q /sys/fs/cgroup; then
+    echo "cgroupsv2 filesystem not mounted, attempting to mount..."
+    
+    # Create mount point if it doesn't exist
+    mkdir -p /sys/fs/cgroup
+    
+    # Try to mount with retries
+    while [ $retry_count -lt $max_retries ]; do
+      if mount -t cgroup2 none /sys/fs/cgroup 2>/tmp/cgroup_mount_error.log; then
+        echo "Successfully mounted cgroupsv2 filesystem"
+        break
+      else
+        retry_count=$((retry_count + 1))
+        echo "Failed to mount cgroupsv2 (attempt $retry_count/$max_retries)"
+        cat /tmp/cgroup_mount_error.log
+        
+        if [ $retry_count -eq $max_retries ]; then
+          echo ""
+          echo "ERROR: Failed to mount cgroupsv2 after $max_retries attempts"
+          echo "Possible causes:"
+          echo "1. Kernel doesn't support cgroupsv2"
+          echo "2. cgroupsv2 already mounted elsewhere"
+          echo "3. Permission issues"
+          echo ""
+          echo "Debug information:"
+          mount | grep cgroup || echo "No cgroup mounts found"
+          ls -la /sys/fs/cgroup/ 2>/dev/null || echo "Cannot list /sys/fs/cgroup"
+          exit 1
+        fi
+        
+        sleep 2
       fi
+    done
+  fi
+  
+  # Verify cgroupsv2 is properly mounted and accessible
+  if [ ! -f /sys/fs/cgroup/cgroup.controllers ]; then
+    echo "ERROR: cgroupsv2 mounted but cgroup.controllers file not found"
+    echo "This may indicate a hybrid cgroup setup or mounting issue"
+    exit 1
+  fi
+  
+  # Check available controllers
+  local controllers=$(cat /sys/fs/cgroup/cgroup.controllers 2>/dev/null || echo "none")
+  echo "cgroupsv2 detected and configured"
+  echo "Available controllers: $controllers"
+  
+  # Verify essential controllers are available
+  if [[ ! "$controllers" =~ "memory" ]] || [[ ! "$controllers" =~ "cpu" ]]; then
+    echo "WARNING: Essential controllers (cpu, memory) may not be available"
+    echo "Container resource limits may not work as expected"
+  fi
+  
+  # Check if we're in a container (nested scenario)
+  if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
+    echo "NOTE: Running inside a container, cgroup delegation may be limited"
+  fi
+}
 
-      ln -s "$mountpoint" "/sys/fs/cgroup/$sys"
+function verify_docker_cgroups_v2() {
+  echo "Verifying Docker cgroupsv2 configuration..."
+  
+  # Source helper functions if not already sourced
+  if ! type get_system_cgroups_version >/dev/null 2>&1; then
+    source $(dirname $0)/docker_config_helper.sh 2>/dev/null || true
+  fi
+  
+  # Check if cgroupsv2 is still properly mounted
+  if ! mountpoint -q /sys/fs/cgroup || [ ! -f /sys/fs/cgroup/cgroup.controllers ]; then
+    echo "ERROR: cgroupsv2 mount was lost after Docker startup"
+    echo "This can happen if Docker reconfigured the cgroup mounts"
+    mount | grep cgroup
+    exit 1
+  fi
+  
+  # Get Docker's cgroup configuration
+  local docker_info=$(docker info 2>/dev/null)
+  
+  # Check cgroup driver
+  local cgroup_driver=$(echo "$docker_info" | grep -i "cgroup driver" | awk '{print $NF}')
+  if [ -z "$cgroup_driver" ]; then
+    echo "WARNING: Unable to determine Docker's cgroup driver"
+  else
+    echo "Docker is using $cgroup_driver cgroup driver"
+    
+    # Check compatibility
+    local system_version=$(get_system_cgroups_version 2>/dev/null || echo "v2")
+    if type verify_cgroup_compatibility >/dev/null 2>&1; then
+      verify_cgroup_compatibility "$cgroup_driver" "$system_version"
     fi
-  done
+  fi
+  
+  # Check cgroup version
+  local cgroup_version=$(echo "$docker_info" | grep -i "cgroup version" | awk '{print $NF}')
+  if [ -n "$cgroup_version" ]; then
+    if [ "$cgroup_version" = "2" ]; then
+      echo "✓ Docker detected cgroupsv2"
+    elif [ "$cgroup_version" = "1" ]; then
+      echo "ERROR: Docker detected cgroupsv1 but system has cgroupsv2"
+      echo "This indicates a configuration mismatch"
+      exit 1
+    fi
+  fi
+  
+  # Test creating a container with resource limits
+  echo "Testing container creation with resource limits..."
+  local test_container=$(docker run -d --rm \
+    --memory="100m" \
+    --cpus="0.5" \
+    --name="cgroup-test-$$" \
+    busybox sleep 30 2>&1)
+  
+  if [ $? -eq 0 ]; then
+    echo "✓ Successfully created container with resource limits"
+    
+    # Verify the limits were applied
+    local container_info=$(docker inspect "cgroup-test-$$" 2>/dev/null)
+    if [ $? -eq 0 ]; then
+      local memory_limit=$(echo "$container_info" | grep -i "memory" | grep "104857600" | wc -l)
+      if [ $memory_limit -gt 0 ]; then
+        echo "✓ Memory limits properly applied"
+      else
+        echo "WARNING: Memory limits may not be properly applied"
+      fi
+    fi
+    
+    # Clean up test container
+    docker stop "cgroup-test-$$" >/dev/null 2>&1 || true
+  else
+    echo "WARNING: Failed to create container with resource limits"
+    echo "Error: $test_container"
+  fi
+  
+  echo "cgroupsv2 verification complete"
 }
 
 function stop_docker() {
@@ -102,13 +238,8 @@ function start_docker() {
   mkdir -p /var/log
   mkdir -p /var/run
 
-  sanitize_cgroups
+  setup_cgroups_v2
 
-  # ensure systemd cgroup is present
-  mkdir -p /sys/fs/cgroup/systemd
-  if ! mountpoint -q /sys/fs/cgroup/systemd ; then
-    mount -t cgroup -o none,name=systemd cgroup /sys/fs/cgroup/systemd
-  fi
 
   # check for /proc/sys being mounted readonly, as systemd does
   if grep '/proc/sys\s\+\w\+\s\+ro,' /proc/mounts >/dev/null; then
@@ -117,19 +248,13 @@ function start_docker() {
 
   local mtu=$(cat /sys/class/net/$(ip route get 8.8.8.8|awk '{ print $5 }')/mtu)
 
+  # Source helper functions
+  source $(dirname $0)/docker_config_helper.sh
+  
   [[ ! -d /etc/docker ]] && mkdir /etc/docker
-  cat <<EOF > /etc/docker/daemon.json
-{
-  "hosts": ["${DOCKER_HOST}"],
-  "tls": true,
-  "tlscert": "${certs_dir}/server-cert.pem",
-  "tlskey": "${certs_dir}/server-key.pem",
-  "tlscacert": "${certs_dir}/ca.pem",
-  "mtu": ${mtu},
-  "data-root": "/scratch/docker",
-  "tlsverify": true
-}
-EOF
+  
+  # Create Docker config with automatic cgroup driver detection and fallback
+  create_docker_config_with_fallback "/etc/docker/daemon.json" "${certs_dir}" "${DOCKER_HOST}" "${mtu}"
 
   trap stop_docker EXIT
 
@@ -154,6 +279,9 @@ EOF
   if [ "$rc" -ne "0" ]; then
     exit 1
   fi
+
+  # Verify cgroupsv2 and Docker configuration
+  verify_docker_cgroups_v2
 
   echo $certs_dir
 }
@@ -183,6 +311,9 @@ function main() {
     -o ../bosh-deployment/docker/cpi.yml \
     -o ../bosh-deployment/jumpbox-user.yml \
     -o manifests/dev.yml \
+    -o manifests/ops-blobstore-bind-all.yml \
+    -o manifests/ops-docker-socket-stable-path.yml \
+    -o manifests/ops-docker-socket-permissions.yml \
     -v director_name=docker \
     -v docker_cpi_path=$cpi_path \
     -v internal_cidr=10.245.0.0/16 \
@@ -213,4 +344,7 @@ EOF
 
 }
 
-main $@
+# Only run main if not being sourced for testing
+if [ -z "$SOURCING_FOR_TEST" ]; then
+  main $@
+fi

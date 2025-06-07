@@ -1,0 +1,49 @@
+---
+# Ops file to increase various timeouts for slower Docker environments
+
+# Increase agent heartbeat interval and timeout
+- type: replace
+  path: /instance_groups/name=bosh/properties/agent/env/bosh/agent?
+  value:
+    heartbeat:
+      interval: 60
+      timeout: 600
+    task:
+      timeout: 600
+
+# Increase director timeout settings
+- type: replace
+  path: /instance_groups/name=bosh/properties/director/timeout?
+  value: 600
+
+# Increase health monitor timeouts
+- type: replace
+  path: /instance_groups/name=bosh/properties/hm/director_account/timeout?
+  value: 600
+
+# Set longer intervals for monit checks
+- type: replace
+  path: /instance_groups/name=bosh/properties/monit?
+  value:
+    timeout: 600
+    interval: 30
+
+# Increase CPI timeout for VM operations
+- type: replace
+  path: /instance_groups/name=bosh/properties/docker_cpi/agent/env?
+  value:
+    bosh:
+      agent:
+        heartbeat:
+          interval: 60
+          timeout: 600
+        task:
+          timeout: 600
+
+# Increase create VM timeout specifically
+- type: replace
+  path: /resource_pools/name=vms/env/bosh/agent?
+  value:
+    heartbeat:
+      interval: 60
+      timeout: 600
