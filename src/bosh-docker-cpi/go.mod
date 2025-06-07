@@ -4,13 +4,13 @@ go 1.23.0
 
 require (
 	github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250524100141-7e6bb4225741
-	github.com/cloudfoundry/bosh-utils v0.0.543
+	github.com/cloudfoundry/bosh-utils v0.0.544
 	github.com/docker/docker v28.2.2+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.36.3
 	github.com/opencontainers/image-spec v1.1.1
-	golang.org/x/net v0.40.0
+	golang.org/x/net v0.41.0
 )
 
 require (
@@ -44,7 +44,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.36.0 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.25.0 // indirect
+	golang.org/x/text v0.26.0 // indirect
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65 // indirect
 	golang.org/x/tools v0.33.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241021214115-324edc3d5d38 // indirect
