@@ -8,11 +8,13 @@ import (
 	bvm "bosh-docker-cpi/vm"
 )
 
+// DetachDiskMethod handles detaching persistent disks from VMs
 type DetachDiskMethod struct {
 	vmFinder   bvm.Finder
 	diskFinder bdisk.Finder
 }
 
+// NewDetachDiskMethod creates a new DetachDiskMethod with the given VM and disk finders
 func NewDetachDiskMethod(vmFinder bvm.Finder, diskFinder bdisk.Finder) DetachDiskMethod {
 	return DetachDiskMethod{
 		vmFinder:   vmFinder,
@@ -20,6 +22,7 @@ func NewDetachDiskMethod(vmFinder bvm.Finder, diskFinder bdisk.Finder) DetachDis
 	}
 }
 
+// DetachDisk detaches a persistent disk from a VM
 func (a DetachDiskMethod) DetachDisk(vmCID apiv1.VMCID, diskCID apiv1.DiskCID) error {
 	vm, err := a.vmFinder.Find(vmCID)
 	if err != nil {

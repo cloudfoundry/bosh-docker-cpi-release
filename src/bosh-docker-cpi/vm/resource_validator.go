@@ -39,7 +39,6 @@
 //   - systemd cgroup driver recommended for cgroupsv2
 //   - Some legacy options may be silently ignored
 //   - Resource validation ensures compatibility
-
 package vm
 
 import (
@@ -51,16 +50,19 @@ import (
 	dkrclient "github.com/docker/docker/client"
 )
 
+// ResourceValidator validates Docker resource limits for cgroupsv2 compatibility
 type ResourceValidator struct {
 	dkrClient *dkrclient.Client
 }
 
+// NewResourceValidator creates a new ResourceValidator with the given Docker client
 func NewResourceValidator(dkrClient *dkrclient.Client) *ResourceValidator {
 	return &ResourceValidator{
 		dkrClient: dkrClient,
 	}
 }
 
+// HostResources contains information about host system resources
 type HostResources struct {
 	TotalMemory     int64
 	AvailableMemory int64
@@ -69,6 +71,7 @@ type HostResources struct {
 	CPUPeriod       int64
 }
 
+// GetHostResources retrieves information about available host resources
 func (rv *ResourceValidator) GetHostResources(ctx context.Context) (*HostResources, error) {
 	info, err := rv.dkrClient.Info(ctx)
 	if err != nil {
@@ -136,8 +139,8 @@ func (rv *ResourceValidator) ValidateVMProps(ctx context.Context, props *Props) 
 		}
 
 		if props.HostConfig.Memory > hostResources.AvailableMemory {
-			// Warning, not error - Docker scheduler might handle this
-			// Log warning but don't fail
+			// Note: Requested memory exceeds available memory - Docker scheduler might handle this
+			// Consider this a warning condition but don't fail validation
 		}
 	}
 
@@ -349,17 +352,19 @@ func (rv *ResourceValidator) GetCgroupsVersion(ctx context.Context) (int, error)
 	}
 
 	// Check CgroupVersion field if available (Docker 20.10+)
-	if info.CgroupVersion == "2" {
+	switch info.CgroupVersion {
+	case "2":
 		return 2, nil
-	} else if info.CgroupVersion == "1" {
+	case "1":
 		return 1, nil
 	}
 
 	// Fallback: check CgroupDriver
-	if info.CgroupDriver == "systemd" {
+	switch info.CgroupDriver {
+	case "systemd":
 		// systemd driver typically indicates cgroupsv2
 		return 2, nil
-	} else if info.CgroupDriver == "cgroupfs" {
+	case "cgroupfs":
 		// cgroupfs typically indicates cgroupsv1, but could be v2
 		// Would need to check /sys/fs/cgroup/cgroup.controllers to be sure
 		return 1, nil

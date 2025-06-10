@@ -16,12 +16,17 @@ import (
 	dkrnet "github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 	dkrclient "github.com/docker/docker/client"
+	cerrdefs "github.com/docker/docker/errdefs"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+// UpdateSettingsPath is the path to the BOSH update settings file
 const UpdateSettingsPath = "/var/vcap/bosh/update_settings.json"
-const DnsRecordsPath = "/var/vcap/instance/dns/records.json"
 
+// DNSRecordsPath is the path to the DNS records file
+const DNSRecordsPath = "/var/vcap/instance/dns/records.json"
+
+// Container represents a Docker container as a VM
 type Container struct {
 	id apiv1.VMCID
 
@@ -31,12 +36,15 @@ type Container struct {
 	logger boshlog.Logger
 }
 
+// EphemeralDiskCID represents an ephemeral disk ID
 type EphemeralDiskCID struct {
 	id apiv1.VMCID
 }
 
+// AsString returns the string representation of the ephemeral disk ID
 func (c EphemeralDiskCID) AsString() string { return "vol-eph-" + c.id.AsString() }
 
+// NewContainer creates a new Container with the given dependencies
 func NewContainer(
 	id apiv1.VMCID,
 	dkrClient *dkrclient.Client,
@@ -53,8 +61,10 @@ func NewContainer(
 	}
 }
 
+// ID returns the container ID
 func (c Container) ID() apiv1.VMCID { return c.id }
 
+// Delete removes the container and its ephemeral disk
 func (c Container) Delete() error {
 	exists, err := c.Exists()
 	if err != nil {
@@ -90,7 +100,7 @@ func (c Container) Delete() error {
 
 	err = c.dkrClient.VolumeRemove(volumeCtx, EphemeralDiskCID{c.id}.AsString(), true)
 	if err != nil {
-		if !dkrclient.IsErrNotFound(err) {
+		if !cerrdefs.IsNotFound(err) {
 			return bosherr.WrapErrorf(err, "Deleting ephemeral volume")
 		}
 	}
@@ -98,13 +108,14 @@ func (c Container) Delete() error {
 	return nil
 }
 
+// Exists checks if the container exists
 func (c Container) Exists() (bool, error) {
 	inspectCtx, inspectCancel := ContextWithTimeout(ShortDockerTimeout)
 	defer inspectCancel()
 
 	_, err := c.dkrClient.ContainerInspect(inspectCtx, c.id.AsString())
 	if err != nil {
-		if dkrclient.IsErrNotFound(err) {
+		if cerrdefs.IsNotFound(err) {
 			return false, nil
 		}
 
@@ -138,6 +149,7 @@ func (c Container) tryKilling() error {
 	return bosherr.WrapError(lastErr, "Killing container")
 }
 
+// AttachDisk attaches a persistent disk to the container
 func (c Container) AttachDisk(disk bdisk.Disk) (apiv1.DiskHint, error) {
 	exists, err := c.Exists()
 	if err != nil {
@@ -159,7 +171,7 @@ func (c Container) AttachDisk(disk bdisk.Disk) (apiv1.DiskHint, error) {
 	if err != nil {
 		c.logger.Warn("attach-disk", "Unable to find update_settings.json skipping: %s", err)
 	}
-	dnsRecords, err := fileService.Download(DnsRecordsPath)
+	dnsRecords, err := fileService.Download(DNSRecordsPath)
 	if err != nil {
 		c.logger.Warn("attach-disk", "Unable to find records.json skipping: %s", err)
 	}
@@ -186,18 +198,18 @@ func (c Container) AttachDisk(disk bdisk.Disk) (apiv1.DiskHint, error) {
 	}
 	if len(dnsRecords) > 0 {
 		// Ensure the DNS directory exists in the new container
-		dnsDir := filepath.Dir(DnsRecordsPath)
+		dnsDir := filepath.Dir(DNSRecordsPath)
 		err = c.runInContainer(fmt.Sprintf("mkdir -p %s && chown vcap:vcap %s", dnsDir, dnsDir))
 		if err != nil {
 			c.logger.Warn("attach-disk", "Failed to create DNS directory: %s", err)
 			// Continue anyway, as DNS records are optional
 		} else {
-			err = fileService.Upload(DnsRecordsPath, dnsRecords)
+			err = fileService.Upload(DNSRecordsPath, dnsRecords)
 			if err != nil {
 				// Log warning but don't fail, as DNS records are optional for container operation
 				c.logger.Warn("attach-disk", "Failed to restore records.json: %s", err)
 			} else {
-				err = c.runInContainer("chgrp vcap " + DnsRecordsPath)
+				err = c.runInContainer("chgrp vcap " + DNSRecordsPath)
 				if err != nil {
 					c.logger.Warn("attach-disk", "Failed to chgrp records.json: %s", err)
 				}
@@ -208,6 +220,7 @@ func (c Container) AttachDisk(disk bdisk.Disk) (apiv1.DiskHint, error) {
 	return diskHint, nil
 }
 
+// DetachDisk detaches a persistent disk from the container
 func (c Container) DetachDisk(disk bdisk.Disk) error {
 	exists, err := c.Exists()
 	if err != nil {
@@ -229,7 +242,7 @@ func (c Container) DetachDisk(disk bdisk.Disk) error {
 	if err != nil {
 		c.logger.Warn("detach-disk", "Unable to find update_settings.json skipping: %s", err)
 	}
-	dnsRecords, err := fileService.Download(DnsRecordsPath)
+	dnsRecords, err := fileService.Download(DNSRecordsPath)
 	if err != nil {
 		c.logger.Warn("detach-disk", "Unable to find records.json skipping: %s", err)
 	}
@@ -255,18 +268,18 @@ func (c Container) DetachDisk(disk bdisk.Disk) error {
 	}
 	if len(dnsRecords) > 0 {
 		// Ensure the DNS directory exists in the new container
-		dnsDir := filepath.Dir(DnsRecordsPath)
+		dnsDir := filepath.Dir(DNSRecordsPath)
 		err = c.runInContainer(fmt.Sprintf("mkdir -p %s && chown vcap:vcap %s", dnsDir, dnsDir))
 		if err != nil {
 			c.logger.Warn("detach-disk", "Failed to create DNS directory: %s", err)
 			// Continue anyway, as DNS records are optional
 		} else {
-			err = fileService.Upload(DnsRecordsPath, dnsRecords)
+			err = fileService.Upload(DNSRecordsPath, dnsRecords)
 			if err != nil {
 				// Log warning but don't fail, as DNS records are optional for container operation
 				c.logger.Warn("detach-disk", "Failed to restore records.json: %s", err)
 			} else {
-				err = c.runInContainer("chgrp vcap " + DnsRecordsPath)
+				err = c.runInContainer("chgrp vcap " + DNSRecordsPath)
 				if err != nil {
 					c.logger.Warn("detach-disk", "Failed to chgrp records.json: %s", err)
 				}
@@ -333,7 +346,11 @@ func (c Container) restartByRecreating(diskID apiv1.DiskCID, diskPath string) er
 
 	err = c.dkrClient.ContainerStart(startCtx, c.id.AsString(), container.StartOptions{})
 	if err != nil {
-		c.Delete() //nolint:errcheck
+		// Attempt cleanup, but prioritize the original error
+		if deleteErr := c.Delete(); deleteErr != nil {
+			// Log cleanup failure but return the original error
+			c.logger.Warn("Container", "Failed to cleanup container after start failure: %s", deleteErr.Error())
+		}
 		return bosherr.WrapError(err, "Starting container")
 	}
 

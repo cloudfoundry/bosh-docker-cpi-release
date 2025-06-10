@@ -15,6 +15,7 @@ import (
 	"golang.org/x/net/context"
 )
 
+// FileService handles file operations within containers
 type FileService interface {
 	Upload(string, []byte) error
 	Download(string) ([]byte, error)
@@ -28,6 +29,7 @@ type fileService struct {
 	logger boshlog.Logger
 }
 
+// NewFileService creates a new FileService for the given container
 func NewFileService(
 	dkrClient *dkrclient.Client,
 	vmCID apiv1.VMCID,

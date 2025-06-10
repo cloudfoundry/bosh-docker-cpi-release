@@ -3,6 +3,7 @@ package vm
 import (
 	"net"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"strconv"
 	"time"
@@ -11,6 +12,31 @@ import (
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
 	dkrclient "github.com/docker/docker/client"
 )
+
+// Regex for validating IP addresses and preventing command injection
+var validIPRegex = regexp.MustCompile(`^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$`)
+
+// validateIP validates that the input is a safe IP address
+func validateIP(ip string) error {
+	if !validIPRegex.MatchString(ip) {
+		return bosherr.Errorf("Invalid IP address format: %s", ip)
+	}
+
+	// Parse as net.IP for additional validation
+	if parsed := net.ParseIP(ip); parsed == nil {
+		return bosherr.Errorf("Invalid IP address: %s", ip)
+	}
+
+	return nil
+}
+
+// validatePort validates that the port is in valid range
+func validatePort(port int) error {
+	if port < 1 || port > 65535 {
+		return bosherr.Errorf("Invalid port number: %d", port)
+	}
+	return nil
+}
 
 // DockerDesktopHelper manages networking issues specific to Docker Desktop
 type DockerDesktopHelper struct {
@@ -49,6 +75,11 @@ func (h *DockerDesktopHelper) SetupNetworkForwarding(containerIP string, hostPor
 
 // addLoopbackAlias adds the container IP as an alias to the loopback interface
 func (h *DockerDesktopHelper) addLoopbackAlias(containerIP string) error {
+	// Validate IP to prevent command injection
+	if err := validateIP(containerIP); err != nil {
+		return bosherr.WrapError(err, "Invalid container IP for loopback alias")
+	}
+
 	cmd := exec.Command("sudo", "ifconfig", "lo0", "alias", containerIP, "netmask", "255.255.255.255")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -61,6 +92,14 @@ func (h *DockerDesktopHelper) addLoopbackAlias(containerIP string) error {
 
 // setupPortForwarding sets up port forwarding using socat
 func (h *DockerDesktopHelper) setupPortForwarding(containerIP string, hostPort int) error {
+	// Validate inputs to prevent command injection
+	if err := validateIP(containerIP); err != nil {
+		return bosherr.WrapError(err, "Invalid container IP")
+	}
+	if err := validatePort(hostPort); err != nil {
+		return bosherr.WrapError(err, "Invalid host port")
+	}
+
 	h.logger.Debug("DockerDesktopHelper", "Setting up socat forwarding from %s:%d to localhost:%d",
 		containerIP, hostPort, hostPort)
 
@@ -70,7 +109,13 @@ func (h *DockerDesktopHelper) setupPortForwarding(containerIP string, hostPort i
 		return bosherr.WrapError(err, "Finding available local IP")
 	}
 
+	// Validate the local IP as well
+	if err := validateIP(localIP); err != nil {
+		return bosherr.WrapError(err, "Invalid local IP")
+	}
+
 	// Use socat to forward traffic
+	// #nosec G204 - hostPort and localIP have been validated above
 	cmd := exec.Command("socat",
 		"TCP-LISTEN:"+strconv.Itoa(hostPort)+",bind="+localIP+",fork",
 		"TCP:localhost:"+strconv.Itoa(hostPort))
@@ -110,6 +155,12 @@ func (h *DockerDesktopHelper) CleanupNetworkForwarding(containerIP string) error
 		return nil
 	}
 
+	// Validate IP before using in any commands
+	if err := validateIP(containerIP); err != nil {
+		h.logger.Warn("DockerDesktopHelper", "Invalid container IP for cleanup: %s", err.Error())
+		return nil
+	}
+
 	h.logger.Debug("DockerDesktopHelper", "Cleaning up network forwarding for %s", containerIP)
 
 	// Remove loopback alias
@@ -121,7 +172,11 @@ func (h *DockerDesktopHelper) CleanupNetworkForwarding(containerIP string) error
 	}
 
 	// Kill any socat processes (this is crude but effective for testing)
-	exec.Command("pkill", "-f", "socat.*"+containerIP).Run()
+	// IP already validated above
+	// #nosec G204 - containerIP has been validated as a safe IP address
+	if err := exec.Command("pkill", "-f", "socat.*"+containerIP).Run(); err != nil {
+		h.logger.Debug("DockerDesktopHelper", "Failed to kill socat processes: %s", err.Error())
+	}
 
 	return nil
 }
@@ -133,7 +188,9 @@ func (h *DockerDesktopHelper) WaitForAgent(agentIP string, agentPort int, timeou
 	for time.Now().Before(deadline) {
 		conn, err := net.DialTimeout("tcp", net.JoinHostPort(agentIP, strconv.Itoa(agentPort)), 2*time.Second)
 		if err == nil {
-			conn.Close()
+			if closeErr := conn.Close(); closeErr != nil {
+				h.logger.Debug("DockerDesktopHelper", "Failed to close connection: %s", closeErr.Error())
+			}
 			h.logger.Debug("DockerDesktopHelper", "Agent is reachable at %s:%d", agentIP, agentPort)
 			return nil
 		}

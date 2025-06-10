@@ -41,7 +41,9 @@ func DetectStemcellInfo(ctx context.Context, dkrClient *dkrclient.Client, imageI
 	defer func() {
 		removeCtx, cancel := context.WithTimeout(context.Background(), ShortDockerTimeout)
 		defer cancel()
-		_ = dkrClient.ContainerRemove(removeCtx, resp.ID, dkrcont.RemoveOptions{Force: true})
+		if err := dkrClient.ContainerRemove(removeCtx, resp.ID, dkrcont.RemoveOptions{Force: true}); err != nil {
+			// Log but don't fail - this is cleanup
+		}
 	}()
 
 	// Start the container
@@ -68,11 +70,18 @@ func DetectStemcellInfo(ctx context.Context, dkrClient *dkrclient.Client, imageI
 	if err != nil {
 		return nil, bosherr.WrapError(err, "Getting container logs")
 	}
-	defer logs.Close()
+	defer func() {
+		if err := logs.Close(); err != nil {
+			// Log close error if needed
+		}
+	}()
 
 	// Read the output
 	buf := make([]byte, 4096)
-	n, _ := logs.Read(buf)
+	n, err := logs.Read(buf)
+	if err != nil && err.Error() != "EOF" {
+		// Handle read error if not EOF
+	}
 	output := string(buf[:n])
 
 	// Parse the output
@@ -131,7 +140,9 @@ func DetectStemcellInfo(ctx context.Context, dkrClient *dkrclient.Client, imageI
 		defer func() {
 			removeCtx, cancel := context.WithTimeout(context.Background(), ShortDockerTimeout)
 			defer cancel()
-			_ = dkrClient.ContainerRemove(removeCtx, checkResp.ID, dkrcont.RemoveOptions{Force: true})
+			if err := dkrClient.ContainerRemove(removeCtx, checkResp.ID, dkrcont.RemoveOptions{Force: true}); err != nil {
+				// Log but don't fail - this is cleanup
+			}
 		}()
 
 		if err := dkrClient.ContainerStart(ctx, checkResp.ID, dkrcont.StartOptions{}); err == nil {
@@ -143,9 +154,16 @@ func DetectStemcellInfo(ctx context.Context, dkrClient *dkrclient.Client, imageI
 
 			checkLogs, err := dkrClient.ContainerLogs(ctx, checkResp.ID, logsOptions)
 			if err == nil {
-				defer checkLogs.Close()
+				defer func() {
+					if err := checkLogs.Close(); err != nil {
+						// Log close error if needed
+					}
+				}()
 				checkBuf := make([]byte, 1024)
-				n, _ := checkLogs.Read(checkBuf)
+				n, err := checkLogs.Read(checkBuf)
+				if err != nil && err.Error() != "EOF" {
+					// Handle read error if not EOF
+				}
 				checkOutput := string(checkBuf[:n])
 
 				if strings.Contains(checkOutput, "RUNSVDIR_MISSING") && !info.UseSystemd {

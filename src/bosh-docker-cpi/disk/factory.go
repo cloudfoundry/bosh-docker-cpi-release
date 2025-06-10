@@ -12,6 +12,7 @@ import (
 	dkrclient "github.com/docker/docker/client"
 )
 
+// Factory creates and finds disk volumes
 type Factory struct {
 	dkrClient *dkrclient.Client
 	uuidGen   boshuuid.Generator
@@ -20,6 +21,7 @@ type Factory struct {
 	logger boshlog.Logger
 }
 
+// NewFactory creates a new disk factory with the given dependencies
 func NewFactory(
 	dkrClient *dkrclient.Client,
 	uuidGen boshuuid.Generator,
@@ -34,6 +36,7 @@ func NewFactory(
 	}
 }
 
+// Create creates a new persistent disk volume
 func (f Factory) Create(size int, vmCID *apiv1.VMCID) (Disk, error) {
 	f.logger.Debug(f.logTag, "Creating disk of size '%d'", size)
 
@@ -70,6 +73,7 @@ func (f Factory) Create(size int, vmCID *apiv1.VMCID) (Disk, error) {
 	return NewVolume(apiv1.NewDiskCID(id), f.dkrClient, f.logger), nil
 }
 
+// Find returns a disk volume by ID
 func (f Factory) Find(id apiv1.DiskCID) (Disk, error) {
 	return NewVolume(id, f.dkrClient, f.logger), nil
 }

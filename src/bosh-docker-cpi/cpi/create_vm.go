@@ -8,11 +8,13 @@ import (
 	bvm "bosh-docker-cpi/vm"
 )
 
+// CreateVMMethod handles creating VMs from stemcells
 type CreateVMMethod struct {
 	stemcellFinder bstem.Finder
 	vmCreator      bvm.Creator
 }
 
+// NewCreateVMMethod creates a new CreateVMMethod with the given stemcell finder and VM creator
 func NewCreateVMMethod(stemcellFinder bstem.Finder, vmCreator bvm.Creator) CreateVMMethod {
 	return CreateVMMethod{
 		stemcellFinder: stemcellFinder,
@@ -20,6 +22,7 @@ func NewCreateVMMethod(stemcellFinder bstem.Finder, vmCreator bvm.Creator) Creat
 	}
 }
 
+// CreateVM creates a new VM (v1 API)
 func (a CreateVMMethod) CreateVM(
 	agentID apiv1.AgentID, stemcellCID apiv1.StemcellCID, cloudProps apiv1.VMCloudProps,
 	networks apiv1.Networks, diskCIDs []apiv1.DiskCID, env apiv1.VMEnv) (apiv1.VMCID, error) {
@@ -28,6 +31,7 @@ func (a CreateVMMethod) CreateVM(
 	return vmCID, err
 }
 
+// CreateVMV2 creates a new VM and returns updated networks (v2 API)
 func (a CreateVMMethod) CreateVMV2(
 	agentID apiv1.AgentID, stemcellCID apiv1.StemcellCID, cloudProps apiv1.VMCloudProps,
 	networks apiv1.Networks, diskCIDs []apiv1.DiskCID, env apiv1.VMEnv) (apiv1.VMCID, apiv1.Networks, error) {

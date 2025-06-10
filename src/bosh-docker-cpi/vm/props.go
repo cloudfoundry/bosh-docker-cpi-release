@@ -5,6 +5,7 @@ import (
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+// Props contains VM properties including Docker configuration
 type Props struct {
 	ExposedPorts []string `json:"ports"` // [6868/tcp]
 
@@ -14,6 +15,7 @@ type Props struct {
 	specs.Platform
 }
 
+// NetProps contains network properties
 type NetProps struct {
 	Name   string
 	Driver string

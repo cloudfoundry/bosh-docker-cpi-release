@@ -7,14 +7,17 @@ import (
 	bvm "bosh-docker-cpi/vm"
 )
 
+// HasVMMethod handles checking if VMs exist
 type HasVMMethod struct {
 	vmFinder bvm.Finder
 }
 
+// NewHasVMMethod creates a new HasVMMethod with the given VM finder
 func NewHasVMMethod(vmFinder bvm.Finder) HasVMMethod {
 	return HasVMMethod{vmFinder: vmFinder}
 }
 
+// HasVM checks if a VM exists
 func (a HasVMMethod) HasVM(vmCID apiv1.VMCID) (bool, error) {
 	vm, err := a.vmFinder.Find(vmCID)
 	if err != nil {

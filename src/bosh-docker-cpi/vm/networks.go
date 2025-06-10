@@ -25,6 +25,7 @@ var (
 	alreadyExistsCheck = "already exists"
 )
 
+// Networks manages Docker networking for VMs
 type Networks struct {
 	dkrClient       *dkrclient.Client
 	uuidGen         boshuuid.Generator
@@ -32,6 +33,7 @@ type Networks struct {
 	isDockerDesktop bool
 }
 
+// NewNetworks creates a new Networks manager with the given dependencies
 func NewNetworks(
 	dkrClient *dkrclient.Client,
 	uuidGen boshuuid.Generator,
@@ -41,6 +43,7 @@ func NewNetworks(
 	return Networks{dkrClient, uuidGen, networks, isDockerDesktop}
 }
 
+// Enable sets up networking for a container
 func (n Networks) Enable() (string, *dkrnet.NetworkingConfig, error) {
 	if len(n.networks) == 0 {
 		return "", nil, bosherr.Error("Expected exactly one network; received zero")
@@ -234,7 +237,7 @@ func detectDockerDesktop(dkrClient *dkrclient.Client) bool {
 		strings.Contains(strings.ToLower(info.KernelVersion), "linuxkit")
 }
 
-// isDockerDesktopEnabled returns whether we detected Docker Desktop
+// IsDockerDesktop returns true if running on Docker Desktop
 func (n Networks) IsDockerDesktop() bool {
 	return n.isDockerDesktop
 }

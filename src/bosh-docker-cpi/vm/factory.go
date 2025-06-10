@@ -21,6 +21,7 @@ import (
 	dkrnat "github.com/docker/go-connections/nat"
 )
 
+// Factory creates and finds VMs as Docker containers
 type Factory struct {
 	dkrClient *dkrclient.Client
 	uuidGen   boshuuid.Generator
@@ -32,6 +33,7 @@ type Factory struct {
 	Config config.Config
 }
 
+// NewFactory creates a new VM factory with the given dependencies
 func NewFactory(
 	dkrClient *dkrclient.Client,
 	uuidGen boshuuid.Generator,
@@ -51,6 +53,7 @@ func NewFactory(
 	}
 }
 
+// Create creates a new VM as a Docker container
 func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	cloudProps apiv1.VMCloudProps, networks apiv1.Networks,
 	diskCIDs []apiv1.DiskCID, env apiv1.VMEnv) (VM, error) {
@@ -162,10 +165,10 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	// Disable seccomp for BPM compatibility inside containers
 	// BPM (BOSH Process Manager) uses runc with seccomp filters that conflict
 	// with Docker's own seccomp filtering when running nested containers
-	if vmProps.HostConfig.SecurityOpt == nil {
-		vmProps.HostConfig.SecurityOpt = []string{}
+	if vmProps.SecurityOpt == nil {
+		vmProps.SecurityOpt = []string{}
 	}
-	vmProps.HostConfig.SecurityOpt = append(vmProps.HostConfig.SecurityOpt, "seccomp=unconfined")
+	vmProps.SecurityOpt = append(vmProps.SecurityOpt, "seccomp=unconfined")
 
 	// Configure networking based on Docker environment
 	if isDockerDesktop {
@@ -442,6 +445,7 @@ echo "Warning: Blobstore may not be ready after retries"
 	return NewContainer(id, f.dkrClient, agentEnvService, f.logger), nil
 }
 
+// Find returns a VM by ID
 func (f Factory) Find(id apiv1.VMCID) (VM, error) {
 	fileService := NewFileService(f.dkrClient, id, f.logger)
 	agentEnvService := NewFSAgentEnvService(fileService, f.logger)
