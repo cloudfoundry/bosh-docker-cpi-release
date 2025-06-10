@@ -43,6 +43,7 @@ func DetectStemcellInfo(ctx context.Context, dkrClient *dkrclient.Client, imageI
 		defer cancel()
 		if err := dkrClient.ContainerRemove(removeCtx, resp.ID, dkrcont.RemoveOptions{Force: true}); err != nil {
 			// Log but don't fail - this is cleanup
+			logger.Debug(logTag, "Failed to remove temporary container %s: %s", resp.ID, err)
 		}
 	}()
 
@@ -73,6 +74,7 @@ func DetectStemcellInfo(ctx context.Context, dkrClient *dkrclient.Client, imageI
 	defer func() {
 		if err := logs.Close(); err != nil {
 			// Log close error if needed
+			logger.Debug(logTag, "Failed to close container logs: %s", err)
 		}
 	}()
 
@@ -81,6 +83,7 @@ func DetectStemcellInfo(ctx context.Context, dkrClient *dkrclient.Client, imageI
 	n, err := logs.Read(buf)
 	if err != nil && err.Error() != "EOF" {
 		// Handle read error if not EOF
+		logger.Debug(logTag, "Error reading container logs: %s", err)
 	}
 	output := string(buf[:n])
 
@@ -142,6 +145,7 @@ func DetectStemcellInfo(ctx context.Context, dkrClient *dkrclient.Client, imageI
 			defer cancel()
 			if err := dkrClient.ContainerRemove(removeCtx, checkResp.ID, dkrcont.RemoveOptions{Force: true}); err != nil {
 				// Log but don't fail - this is cleanup
+				logger.Debug(logTag, "Failed to remove systemd check container %s: %s", checkResp.ID, err)
 			}
 		}()
 
@@ -157,12 +161,14 @@ func DetectStemcellInfo(ctx context.Context, dkrClient *dkrclient.Client, imageI
 				defer func() {
 					if err := checkLogs.Close(); err != nil {
 						// Log close error if needed
+						logger.Debug(logTag, "Failed to close systemd check logs: %s", err)
 					}
 				}()
 				checkBuf := make([]byte, 1024)
 				n, err := checkLogs.Read(checkBuf)
 				if err != nil && err.Error() != "EOF" {
 					// Handle read error if not EOF
+					logger.Debug(logTag, "Error reading systemd check logs: %s", err)
 				}
 				checkOutput := string(checkBuf[:n])
 

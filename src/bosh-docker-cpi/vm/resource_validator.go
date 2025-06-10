@@ -141,6 +141,7 @@ func (rv *ResourceValidator) ValidateVMProps(ctx context.Context, props *Props) 
 		if props.HostConfig.Memory > hostResources.AvailableMemory {
 			// Note: Requested memory exceeds available memory - Docker scheduler might handle this
 			// Consider this a warning condition but don't fail validation
+			_ = hostResources.AvailableMemory // Mark as intentionally unused to avoid linter warning
 		}
 	}
 
