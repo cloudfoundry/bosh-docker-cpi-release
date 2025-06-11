@@ -175,12 +175,12 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		// For Docker Desktop, use bridge networking with specific port forwarding
 		vmProps.HostConfig.PublishAllPorts = true //nolint:staticcheck
 		// Add explicit port binding for BOSH agent to ensure connectivity
-		if vmProps.HostConfig.PortBindings == nil {
-			vmProps.HostConfig.PortBindings = make(map[dkrnat.Port][]dkrnat.PortBinding)
+		if vmProps.PortBindings == nil {
+			vmProps.PortBindings = make(map[dkrnat.Port][]dkrnat.PortBinding)
 		}
 		// Map container port 6868 to host port 6868 for direct access
 		agentPort := dkrnat.Port("6868/tcp")
-		vmProps.HostConfig.PortBindings[agentPort] = []dkrnat.PortBinding{
+		vmProps.PortBindings[agentPort] = []dkrnat.PortBinding{
 			{HostIP: "0.0.0.0", HostPort: "6868"},
 		}
 		f.logger.Debug(f.logTag, "Using bridge networking with Docker Desktop port forwarding")
@@ -198,40 +198,40 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	}
 
 	// Log applied resource limits for debugging and auditing
-	if vmProps.HostConfig.Memory > 0 {
+	if vmProps.Memory > 0 {
 		f.logger.Debug(f.logTag, "Applying memory limit: %d bytes (%.2f GB)",
-			vmProps.HostConfig.Memory, float64(vmProps.HostConfig.Memory)/(1024*1024*1024))
+			vmProps.Memory, float64(vmProps.Memory)/(1024*1024*1024))
 	}
-	if vmProps.HostConfig.NanoCPUs > 0 {
+	if vmProps.NanoCPUs > 0 {
 		f.logger.Debug(f.logTag, "Applying CPU limit: %d nanocpus (%.2f CPUs)",
-			vmProps.HostConfig.NanoCPUs, float64(vmProps.HostConfig.NanoCPUs)/1e9)
+			vmProps.NanoCPUs, float64(vmProps.NanoCPUs)/1e9)
 	}
-	if vmProps.HostConfig.CPUShares > 0 {
-		f.logger.Debug(f.logTag, "Applying CPU shares: %d", vmProps.HostConfig.CPUShares)
+	if vmProps.CPUShares > 0 {
+		f.logger.Debug(f.logTag, "Applying CPU shares: %d", vmProps.CPUShares)
 	}
-	if vmProps.HostConfig.CPUQuota > 0 && vmProps.HostConfig.CPUPeriod > 0 {
+	if vmProps.CPUQuota > 0 && vmProps.CPUPeriod > 0 {
 		f.logger.Debug(f.logTag, "Applying CPU quota: %d/%d (%.2f%% of CPU)",
-			vmProps.HostConfig.CPUQuota, vmProps.HostConfig.CPUPeriod,
-			float64(vmProps.HostConfig.CPUQuota)/float64(vmProps.HostConfig.CPUPeriod)*100)
+			vmProps.CPUQuota, vmProps.CPUPeriod,
+			float64(vmProps.CPUQuota)/float64(vmProps.CPUPeriod)*100)
 	}
-	if vmProps.HostConfig.PidsLimit != nil && *vmProps.HostConfig.PidsLimit > 0 {
-		f.logger.Debug(f.logTag, "Applying PIDs limit: %d", *vmProps.HostConfig.PidsLimit)
+	if vmProps.PidsLimit != nil && *vmProps.PidsLimit > 0 {
+		f.logger.Debug(f.logTag, "Applying PIDs limit: %d", *vmProps.PidsLimit)
 	}
-	if vmProps.HostConfig.MemoryReservation > 0 {
+	if vmProps.MemoryReservation > 0 {
 		f.logger.Debug(f.logTag, "Applying memory reservation: %d bytes (%.2f GB)",
-			vmProps.HostConfig.MemoryReservation, float64(vmProps.HostConfig.MemoryReservation)/(1024*1024*1024))
+			vmProps.MemoryReservation, float64(vmProps.MemoryReservation)/(1024*1024*1024))
 	}
-	if vmProps.HostConfig.MemorySwap > 0 {
+	if vmProps.MemorySwap > 0 {
 		f.logger.Debug(f.logTag, "Applying memory+swap limit: %d bytes (%.2f GB)",
-			vmProps.HostConfig.MemorySwap, float64(vmProps.HostConfig.MemorySwap)/(1024*1024*1024))
+			vmProps.MemorySwap, float64(vmProps.MemorySwap)/(1024*1024*1024))
 	}
-	if vmProps.HostConfig.BlkioWeight > 0 {
-		f.logger.Debug(f.logTag, "Applying block I/O weight: %d", vmProps.HostConfig.BlkioWeight)
+	if vmProps.BlkioWeight > 0 {
+		f.logger.Debug(f.logTag, "Applying block I/O weight: %d", vmProps.BlkioWeight)
 	}
-	if len(vmProps.HostConfig.BlkioDeviceReadBps) > 0 || len(vmProps.HostConfig.BlkioDeviceWriteBps) > 0 {
+	if len(vmProps.BlkioDeviceReadBps) > 0 || len(vmProps.BlkioDeviceWriteBps) > 0 {
 		f.logger.Debug(f.logTag, "Applying block I/O bandwidth limits")
 	}
-	if len(vmProps.HostConfig.BlkioDeviceReadIOps) > 0 || len(vmProps.HostConfig.BlkioDeviceWriteIOps) > 0 {
+	if len(vmProps.BlkioDeviceReadIOps) > 0 || len(vmProps.BlkioDeviceWriteIOps) > 0 {
 		f.logger.Debug(f.logTag, "Applying block I/O IOPS limits")
 	}
 
@@ -552,7 +552,7 @@ func (f Factory) cleanMounts(vmProps Props) (Props, error) {
 	const unixSock = "unix://"
 
 	for i := range vmProps.HostConfig.Mounts { //nolint:staticcheck
-		mount := &vmProps.HostConfig.Mounts[i]
+		mount := &vmProps.Mounts[i]
 
 		// Validate and clean unix socket paths
 		if strings.HasPrefix(mount.Source, unixSock) { //nolint:gosimple,staticcheck

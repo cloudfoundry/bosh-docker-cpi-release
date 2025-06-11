@@ -121,16 +121,16 @@ func (rv *ResourceValidator) ValidateVMProps(ctx context.Context, props *Props) 
 
 	// Validate memory limits
 	// CGROUPSv2: Memory controller validates memory.max
-	if props.HostConfig.Memory > 0 {
-		if props.HostConfig.Memory < 0 {
+	if props.Memory > 0 {
+		if props.Memory < 0 {
 			return bosherr.Error("Memory limit cannot be negative")
 		}
 
 		// Minimum memory requirement (32MB)
 		minMemory := int64(32 * 1024 * 1024)
-		if props.HostConfig.Memory < minMemory {
+		if props.Memory < minMemory {
 			return bosherr.Errorf("Memory limit %d is below minimum requirement of %d bytes (32MB)",
-				props.HostConfig.Memory, minMemory)
+				props.Memory, minMemory)
 		}
 
 		if props.HostConfig.Memory > hostResources.TotalMemory {
