@@ -18,8 +18,8 @@ var _ = Describe("Props", func() {
 				err := json.Unmarshal([]byte(`{"CPUShares": 10, "Memory": 1024}`), &props)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(props.HostConfig.CPUShares).To(Equal(int64(10)))
-				Expect(props.HostConfig.Memory).To(Equal(int64(1024)))
+				Expect(props.CPUShares).To(Equal(int64(10)))
+				Expect(props.Memory).To(Equal(int64(1024)))
 			})
 
 			It("handles CPU limits", func() {
@@ -37,12 +37,12 @@ var _ = Describe("Props", func() {
 				err := json.Unmarshal([]byte(jsonData), &props)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(props.HostConfig.CPUShares).To(Equal(int64(512)))
-				Expect(props.HostConfig.NanoCPUs).To(Equal(int64(2000000000)))
-				Expect(props.HostConfig.CPUQuota).To(Equal(int64(50000)))
-				Expect(props.HostConfig.CPUPeriod).To(Equal(int64(100000)))
-				Expect(props.HostConfig.CpusetCpus).To(Equal("0-3"))
-				Expect(props.HostConfig.CpusetMems).To(Equal("0"))
+				Expect(props.CPUShares).To(Equal(int64(512)))
+				Expect(props.NanoCPUs).To(Equal(int64(2000000000)))
+				Expect(props.CPUQuota).To(Equal(int64(50000)))
+				Expect(props.CPUPeriod).To(Equal(int64(100000)))
+				Expect(props.CpusetCpus).To(Equal("0-3"))
+				Expect(props.CpusetMems).To(Equal("0"))
 			})
 
 			It("handles memory limits", func() {
@@ -59,11 +59,11 @@ var _ = Describe("Props", func() {
 				err := json.Unmarshal([]byte(jsonData), &props)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(props.HostConfig.Memory).To(Equal(int64(1073741824)))
-				Expect(props.HostConfig.MemorySwap).To(Equal(int64(2147483648)))
-				Expect(props.HostConfig.MemoryReservation).To(Equal(int64(536870912)))
-				Expect(props.HostConfig.KernelMemory).To(Equal(int64(134217728)))
-				Expect(*props.HostConfig.MemorySwappiness).To(Equal(int64(10)))
+				Expect(props.Memory).To(Equal(int64(1073741824)))
+				Expect(props.MemorySwap).To(Equal(int64(2147483648)))
+				Expect(props.MemoryReservation).To(Equal(int64(536870912)))
+				Expect(props.KernelMemory).To(Equal(int64(134217728)))
+				Expect(*props.MemorySwappiness).To(Equal(int64(10)))
 			})
 		})
 
@@ -75,7 +75,7 @@ var _ = Describe("Props", func() {
 				err := json.Unmarshal([]byte(jsonData), &props)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(*props.HostConfig.PidsLimit).To(Equal(int64(100)))
+				Expect(*props.PidsLimit).To(Equal(int64(100)))
 			})
 
 			It("handles block IO properties", func() {
@@ -93,12 +93,12 @@ var _ = Describe("Props", func() {
 				err := json.Unmarshal([]byte(jsonData), &props)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(props.HostConfig.BlkioWeight).To(Equal(uint16(500)))
-				Expect(props.HostConfig.BlkioWeightDevice).To(HaveLen(1))
-				Expect(props.HostConfig.BlkioDeviceReadBps).To(HaveLen(1))
-				Expect(props.HostConfig.BlkioDeviceWriteBps).To(HaveLen(1))
-				Expect(props.HostConfig.BlkioDeviceReadIOps).To(HaveLen(1))
-				Expect(props.HostConfig.BlkioDeviceWriteIOps).To(HaveLen(1))
+				Expect(props.BlkioWeight).To(Equal(uint16(500)))
+				Expect(props.BlkioWeightDevice).To(HaveLen(1))
+				Expect(props.BlkioDeviceReadBps).To(HaveLen(1))
+				Expect(props.BlkioDeviceWriteBps).To(HaveLen(1))
+				Expect(props.BlkioDeviceReadIOps).To(HaveLen(1))
+				Expect(props.BlkioDeviceWriteIOps).To(HaveLen(1))
 			})
 
 			It("handles OOM settings", func() {
@@ -112,8 +112,8 @@ var _ = Describe("Props", func() {
 				err := json.Unmarshal([]byte(jsonData), &props)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(*props.HostConfig.OomKillDisable).To(BeTrue())
-				Expect(props.HostConfig.OomScoreAdj).To(Equal(500))
+				Expect(*props.OomKillDisable).To(BeTrue())
+				Expect(props.OomScoreAdj).To(Equal(500))
 			})
 		})
 
@@ -131,9 +131,9 @@ var _ = Describe("Props", func() {
 				err := json.Unmarshal([]byte(jsonData), &props)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(props.HostConfig.Binds).To(HaveLen(2))
-				Expect(props.HostConfig.Binds[0]).To(Equal("/host/path:/container/path:ro"))
-				Expect(props.HostConfig.Binds[1]).To(Equal("/another/host:/another/container"))
+				Expect(props.Binds).To(HaveLen(2))
+				Expect(props.Binds[0]).To(Equal("/host/path:/container/path:ro"))
+				Expect(props.Binds[1]).To(Equal("/another/host:/another/container"))
 			})
 
 			It("handles mounts", func() {
@@ -202,8 +202,8 @@ var _ = Describe("Props", func() {
 				err := json.Unmarshal([]byte(jsonData), &props)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(string(props.HostConfig.NetworkMode)).To(Equal("bridge"))
-				Expect(props.HostConfig.PortBindings).To(HaveLen(2))
+				Expect(string(props.NetworkMode)).To(Equal("bridge"))
+				Expect(props.PortBindings).To(HaveLen(2))
 			})
 		})
 
@@ -222,11 +222,11 @@ var _ = Describe("Props", func() {
 				err := json.Unmarshal([]byte(jsonData), &props)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(props.HostConfig.Privileged).To(BeTrue())
-				Expect(props.HostConfig.ReadonlyRootfs).To(BeTrue())
-				Expect(props.HostConfig.SecurityOpt).To(ContainElement("no-new-privileges"))
-				Expect(props.HostConfig.CapAdd).To(ContainElement("SYS_ADMIN"))
-				Expect(props.HostConfig.CapDrop).To(ContainElement("MKNOD"))
+				Expect(props.Privileged).To(BeTrue())
+				Expect(props.ReadonlyRootfs).To(BeTrue())
+				Expect(props.SecurityOpt).To(ContainElement("no-new-privileges"))
+				Expect(props.CapAdd).To(ContainElement("SYS_ADMIN"))
+				Expect(props.CapDrop).To(ContainElement("MKNOD"))
 			})
 
 			It("handles ulimits", func() {
@@ -242,10 +242,10 @@ var _ = Describe("Props", func() {
 				err := json.Unmarshal([]byte(jsonData), &props)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(props.HostConfig.Ulimits).To(HaveLen(2))
-				Expect(props.HostConfig.Ulimits[0].Name).To(Equal("nofile"))
-				Expect(props.HostConfig.Ulimits[0].Soft).To(Equal(int64(1024)))
-				Expect(props.HostConfig.Ulimits[0].Hard).To(Equal(int64(2048)))
+				Expect(props.Ulimits).To(HaveLen(2))
+				Expect(props.Ulimits[0].Name).To(Equal("nofile"))
+				Expect(props.Ulimits[0].Soft).To(Equal(int64(1024)))
+				Expect(props.Ulimits[0].Hard).To(Equal(int64(2048)))
 			})
 		})
 
@@ -284,13 +284,13 @@ var _ = Describe("Props", func() {
 				err := json.Unmarshal([]byte(jsonData), &props)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(props.HostConfig.Memory).To(Equal(int64(2147483648)))
-				Expect(props.HostConfig.CPUShares).To(Equal(int64(1024)))
-				Expect(*props.HostConfig.PidsLimit).To(Equal(int64(200)))
-				Expect(props.HostConfig.BlkioWeight).To(Equal(uint16(500)))
-				Expect(props.HostConfig.Binds).To(ContainElement("/data:/data"))
-				Expect(string(props.HostConfig.NetworkMode)).To(Equal("bridge"))
-				Expect(props.HostConfig.Privileged).To(BeFalse())
+				Expect(props.Memory).To(Equal(int64(2147483648)))
+				Expect(props.CPUShares).To(Equal(int64(1024)))
+				Expect(*props.PidsLimit).To(Equal(int64(200)))
+				Expect(props.BlkioWeight).To(Equal(uint16(500)))
+				Expect(props.Binds).To(ContainElement("/data:/data"))
+				Expect(string(props.NetworkMode)).To(Equal("bridge"))
+				Expect(props.Privileged).To(BeFalse())
 				Expect(props.ExposedPorts).To(ContainElement("80/tcp"))
 				Expect(props.ExposedPorts).To(ContainElement("443/tcp"))
 			})
@@ -304,8 +304,8 @@ var _ = Describe("Props", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				// Should have zero values
-				Expect(props.HostConfig.Memory).To(Equal(int64(0)))
-				Expect(props.HostConfig.CPUShares).To(Equal(int64(0)))
+				Expect(props.Memory).To(Equal(int64(0)))
+				Expect(props.CPUShares).To(Equal(int64(0)))
 			})
 
 			It("handles null values appropriately", func() {
@@ -320,7 +320,7 @@ var _ = Describe("Props", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				// Null should result in zero values for basic types
-				Expect(props.HostConfig.Memory).To(Equal(int64(0)))
+				Expect(props.Memory).To(Equal(int64(0)))
 			})
 
 			It("ignores unknown properties", func() {
@@ -335,7 +335,7 @@ var _ = Describe("Props", func() {
 				err := json.Unmarshal([]byte(jsonData), &props)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(props.HostConfig.Memory).To(Equal(int64(1024)))
+				Expect(props.Memory).To(Equal(int64(1024)))
 			})
 		})
 
@@ -355,9 +355,9 @@ var _ = Describe("Props", func() {
 
 				// Resource limits should be set for cgroupsv2
 				// SystemdMode was removed - cgroupsv2 is always used
-				Expect(props.HostConfig.Memory).To(Equal(int64(1073741824)))
-				Expect(props.HostConfig.CPUShares).To(Equal(int64(512)))
-				Expect(*props.HostConfig.PidsLimit).To(Equal(int64(100)))
+				Expect(props.Memory).To(Equal(int64(1073741824)))
+				Expect(props.CPUShares).To(Equal(int64(512)))
+				Expect(*props.PidsLimit).To(Equal(int64(100)))
 			})
 
 			It("handles cgroupsv2-specific resource limits", func() {
@@ -377,12 +377,12 @@ var _ = Describe("Props", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				// Verify all cgroupsv2 resource limits are properly set
-				Expect(props.HostConfig.Memory).To(Equal(int64(2147483648)))
-				Expect(props.HostConfig.MemorySwap).To(Equal(int64(2147483648)))
-				Expect(props.HostConfig.CPUShares).To(Equal(int64(1024)))
-				Expect(props.HostConfig.NanoCPUs).To(Equal(int64(2000000000)))
-				Expect(*props.HostConfig.PidsLimit).To(Equal(int64(200)))
-				Expect(props.HostConfig.BlkioWeight).To(Equal(uint16(500)))
+				Expect(props.Memory).To(Equal(int64(2147483648)))
+				Expect(props.MemorySwap).To(Equal(int64(2147483648)))
+				Expect(props.CPUShares).To(Equal(int64(1024)))
+				Expect(props.NanoCPUs).To(Equal(int64(2000000000)))
+				Expect(*props.PidsLimit).To(Equal(int64(200)))
+				Expect(props.BlkioWeight).To(Equal(uint16(500)))
 				// SystemdMode was removed - cgroupsv2 is always used
 			})
 
@@ -399,9 +399,9 @@ var _ = Describe("Props", func() {
 				err := json.Unmarshal([]byte(jsonData), &props)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(*props.HostConfig.Init).To(BeTrue())
+				Expect(*props.Init).To(BeTrue())
 				// SystemdMode was removed - cgroupsv2 is always used
-				Expect(props.HostConfig.CgroupParent).To(Equal("system.slice"))
+				Expect(props.CgroupParent).To(Equal("system.slice"))
 			})
 
 			It("validates cgroupsv2 hierarchy paths", func() {
@@ -415,7 +415,7 @@ var _ = Describe("Props", func() {
 				err := json.Unmarshal([]byte(jsonData), &props)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(props.HostConfig.CgroupParent).To(Equal("system.slice/docker.slice"))
+				Expect(props.CgroupParent).To(Equal("system.slice/docker.slice"))
 				// Cgroups field was removed from HostConfig
 			})
 
@@ -437,10 +437,10 @@ var _ = Describe("Props", func() {
 				err := json.Unmarshal([]byte(jsonData), &props)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(props.HostConfig.DeviceCgroupRules).To(HaveLen(2))
-				Expect(props.HostConfig.DeviceCgroupRules[0]).To(Equal("c 1:3 mr"))
-				Expect(props.HostConfig.Devices).To(HaveLen(1))
-				Expect(props.HostConfig.Devices[0].PathOnHost).To(Equal("/dev/fuse"))
+				Expect(props.DeviceCgroupRules).To(HaveLen(2))
+				Expect(props.DeviceCgroupRules[0]).To(Equal("c 1:3 mr"))
+				Expect(props.Devices).To(HaveLen(1))
+				Expect(props.Devices[0].PathOnHost).To(Equal("/dev/fuse"))
 			})
 
 			It("handles unified cgroupsv2 resource format", func() {
@@ -460,7 +460,7 @@ var _ = Describe("Props", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				// Resources should be mapped to HostConfig
-				Expect(props.HostConfig.Memory).To(BeZero()) // This format might not be supported yet
+				Expect(props.Memory).To(BeZero()) // This format might not be supported yet
 			})
 		})
 	})
