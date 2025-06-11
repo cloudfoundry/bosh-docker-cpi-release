@@ -133,12 +133,12 @@ func (rv *ResourceValidator) ValidateVMProps(ctx context.Context, props *Props) 
 				props.Memory, minMemory)
 		}
 
-		if props.HostConfig.Memory > hostResources.TotalMemory {
+		if props.Memory > hostResources.TotalMemory {
 			return bosherr.Errorf("Requested memory %d exceeds host total memory %d",
-				props.HostConfig.Memory, hostResources.TotalMemory)
+				props.Memory, hostResources.TotalMemory)
 		}
 
-		if props.HostConfig.Memory > hostResources.AvailableMemory {
+		if props.Memory > hostResources.AvailableMemory {
 			// Note: Requested memory exceeds available memory - Docker scheduler might handle this
 			// Consider this a warning condition but don't fail validation
 			_ = hostResources.AvailableMemory // Mark as intentionally unused to avoid linter warning
@@ -147,32 +147,32 @@ func (rv *ResourceValidator) ValidateVMProps(ctx context.Context, props *Props) 
 
 	// Validate memory + swap
 	// CGROUPSv2: Separate memory.swap.max control (not combined with memory)
-	if props.HostConfig.MemorySwap > 0 {
-		if props.HostConfig.MemorySwap < props.HostConfig.Memory {
+	if props.MemorySwap > 0 {
+		if props.MemorySwap < props.Memory {
 			return bosherr.Error("MemorySwap must be larger than Memory limit")
 		}
 	}
 
 	// Validate CPU shares (relative weight)
 	// CGROUPSv2: CPUShares maps to cpu.weight (converted: weight = 1 + ((shares-2)*9999)/262142)
-	if props.HostConfig.CPUShares < 0 {
+	if props.CPUShares < 0 {
 		return bosherr.Error("CPU shares cannot be negative")
 	}
 
 	// Validate CPU quota/period for hard limits
 	// CGROUPSv2: Maps to cpu.max as "quota period" in microseconds
-	if props.HostConfig.CPUQuota > 0 {
-		if props.HostConfig.CPUPeriod <= 0 {
+	if props.CPUQuota > 0 {
+		if props.CPUPeriod <= 0 {
 			// Set default period if not specified
-			props.HostConfig.CPUPeriod = 100000 // 100ms default
+			props.CPUPeriod = 100000 // 100ms default
 		}
 
-		if props.HostConfig.CPUQuota < 1000 {
+		if props.CPUQuota < 1000 {
 			return bosherr.Error("CPU quota must be at least 1000 microseconds")
 		}
 
 		// Calculate requested CPUs (quota/period)
-		requestedCPUs := float64(props.HostConfig.CPUQuota) / float64(props.HostConfig.CPUPeriod)
+		requestedCPUs := float64(props.CPUQuota) / float64(props.CPUPeriod)
 		if requestedCPUs > float64(hostResources.TotalCPU) {
 			return bosherr.Errorf("Requested CPU quota %.2f exceeds host CPU count %d",
 				requestedCPUs, hostResources.TotalCPU)
@@ -181,35 +181,35 @@ func (rv *ResourceValidator) ValidateVMProps(ctx context.Context, props *Props) 
 
 	// Validate NanoCPUs (Docker 1.12.3+)
 	// CGROUPSv2: Internally converted to cpu.max quota/period values
-	if props.HostConfig.NanoCPUs > 0 {
-		requestedCPUs := float64(props.HostConfig.NanoCPUs) / 1e9
+	if props.NanoCPUs > 0 {
+		requestedCPUs := float64(props.NanoCPUs) / 1e9
 		if requestedCPUs > float64(hostResources.TotalCPU) {
 			return bosherr.Errorf("Requested CPUs %.2f exceeds host CPU count %d",
 				requestedCPUs, hostResources.TotalCPU)
 		}
 
 		// Minimum CPU requirement (0.01 CPU)
-		if props.HostConfig.NanoCPUs < 1e7 {
+		if props.NanoCPUs < 1e7 {
 			return bosherr.Error("CPU limit must be at least 0.01 CPU")
 		}
 	}
 
 	// Validate PIDs limit (cgroupsv2 feature)
 	// CGROUPSv2: Maps directly to pids.max in the pids controller
-	if props.HostConfig.PidsLimit != nil && *props.HostConfig.PidsLimit < 0 {
+	if props.PidsLimit != nil && *props.PidsLimit < 0 {
 		return bosherr.Error("PIDs limit cannot be negative")
 	}
 
 	// Validate CPU set (specific CPU cores)
-	if props.HostConfig.CpusetCpus != "" {
+	if props.CpusetCpus != "" {
 		// Validate format and CPU existence
-		if err := validateCPUSet(props.HostConfig.CpusetCpus, hostResources.TotalCPU); err != nil {
+		if err := validateCPUSet(props.CpusetCpus, hostResources.TotalCPU); err != nil {
 			return bosherr.WrapError(err, "Invalid CpusetCpus")
 		}
 	}
 
 	// Validate Ulimits
-	for _, ulimit := range props.HostConfig.Ulimits {
+	for _, ulimit := range props.Ulimits {
 		if ulimit.Soft > ulimit.Hard {
 			return bosherr.Errorf("Ulimit %s: soft limit %d exceeds hard limit %d",
 				ulimit.Name, ulimit.Soft, ulimit.Hard)
@@ -234,14 +234,14 @@ func (rv *ResourceValidator) ValidateVMProps(ctx context.Context, props *Props) 
 
 // ValidateMounts validates mount configurations
 func (rv *ResourceValidator) ValidateMounts(props *Props) error {
-	for i, mount := range props.HostConfig.Mounts {
+	for i, mount := range props.Mounts {
 		// Validate mount type
 		switch mount.Type {
 		case "bind", "volume", "tmpfs", "npipe":
 			// Valid types
 		case "":
 			// Default to volume if not specified
-			props.HostConfig.Mounts[i].Type = "volume"
+			props.Mounts[i].Type = "volume"
 		default:
 			return bosherr.Errorf("Invalid mount type '%s' for mount %s", mount.Type, mount.Target)
 		}
@@ -277,7 +277,7 @@ func (rv *ResourceValidator) ValidateMounts(props *Props) error {
 
 // ValidateBinds validates bind volume configurations
 func (rv *ResourceValidator) ValidateBinds(props *Props) error {
-	for _, bind := range props.HostConfig.Binds {
+	for _, bind := range props.Binds {
 		// Bind format: source:destination[:options]
 		parts := strings.Split(bind, ":")
 		if len(parts) < 2 {

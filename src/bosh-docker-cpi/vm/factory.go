@@ -555,7 +555,7 @@ func (f Factory) cleanMounts(vmProps Props) (Props, error) {
 		mount := &vmProps.Mounts[i]
 
 		// Validate and clean unix socket paths
-		if strings.HasPrefix(mount.Source, unixSock) { //nolint:gosimple,staticcheck
+		if strings.HasPrefix(mount.Source, unixSock) { //nolint:staticcheck
 			cleanPath := strings.TrimPrefix(mount.Source, unixSock)
 
 			// Validate the cleaned path

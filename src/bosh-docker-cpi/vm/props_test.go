@@ -154,8 +154,8 @@ var _ = Describe("Props", func() {
 				err := json.Unmarshal([]byte(jsonData), &props)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(props.HostConfig.Mounts).To(HaveLen(1))
-				mount := props.HostConfig.Mounts[0]
+				Expect(props.Mounts).To(HaveLen(1))
+				mount := props.Mounts[0]
 				Expect(string(mount.Type)).To(Equal("bind"))
 				Expect(mount.Source).To(Equal("/host/path"))
 				Expect(mount.Target).To(Equal("/container/path"))
@@ -179,8 +179,8 @@ var _ = Describe("Props", func() {
 				err := json.Unmarshal([]byte(jsonData), &props)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(props.HostConfig.Mounts).To(HaveLen(1))
-				mount := props.HostConfig.Mounts[0]
+				Expect(props.Mounts).To(HaveLen(1))
+				mount := props.Mounts[0]
 				Expect(string(mount.Type)).To(Equal("tmpfs"))
 				Expect(mount.Target).To(Equal("/tmp"))
 				Expect(mount.TmpfsOptions.SizeBytes).To(Equal(int64(67108864)))
