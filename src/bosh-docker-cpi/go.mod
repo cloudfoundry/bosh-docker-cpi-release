@@ -3,8 +3,8 @@ module bosh-docker-cpi
 go 1.23.0
 
 require (
-	github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250524100141-7e6bb4225741
-	github.com/cloudfoundry/bosh-utils v0.0.544
+	github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250607100112-b7e905fe09bd
+	github.com/cloudfoundry/bosh-utils v0.0.545
 	github.com/docker/docker v28.2.2+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/onsi/ginkgo/v2 v2.23.4
@@ -28,7 +28,7 @@ require (
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/pprof v0.0.0-20250501235452-c0086092b71a // indirect
+	github.com/google/pprof v0.0.0-20250602020802-c6617b811d0e // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/sys/atomicwriter v0.1.0 // indirect
 	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6 // indirect
@@ -46,7 +46,7 @@ require (
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65 // indirect
-	golang.org/x/tools v0.33.0 // indirect
+	golang.org/x/tools v0.34.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241021214115-324edc3d5d38 // indirect
 	google.golang.org/grpc v1.67.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
