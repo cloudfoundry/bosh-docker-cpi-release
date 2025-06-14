@@ -1,0 +1,5 @@
+---
+# Remove the hardcoded stemcell from bosh-deployment docker/cpi.yml
+# This allows us to use our own stemcell uploaded in the test script
+- type: remove
+  path: /resource_pools/name=vms/stemcell?

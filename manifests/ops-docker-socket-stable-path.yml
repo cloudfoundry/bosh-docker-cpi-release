@@ -1,0 +1,20 @@
+---
+# Fix Docker socket mount for containers where /run is replaced by tmpfs
+# Mount the socket to /docker.sock which won't be overridden by systemd
+
+# Add Docker socket bind mount to a stable path
+- type: replace
+  path: /resource_pools/name=vms/cloud_properties/Binds?
+  value:
+    - /var/run/docker.sock:/docker.sock
+
+# Also add to env_pooled cloud properties if it exists
+- type: replace
+  path: /resource_pools/name=vms/env_pooled_cloud_properties?/Binds?
+  value:
+    - /var/run/docker.sock:/docker.sock
+
+# Configure the BOSH director's CPI to use the stable socket path
+- type: replace
+  path: /instance_groups/name=bosh/properties/docker_cpi/docker/host?
+  value: unix:///docker.sock

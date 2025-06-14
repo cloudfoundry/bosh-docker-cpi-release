@@ -10,6 +10,7 @@ import (
 	dkrclient "github.com/docker/docker/client"
 )
 
+// Image represents a stemcell as a Docker image
 type Image struct {
 	id apiv1.StemcellCID
 
@@ -18,12 +19,15 @@ type Image struct {
 	logger boshlog.Logger
 }
 
+// NewImage creates a new Image with the given ID, Docker client, and logger
 func NewImage(id apiv1.StemcellCID, dkrClient *dkrclient.Client, logger boshlog.Logger) Image {
 	return Image{id, dkrClient, logger}
 }
 
+// ID returns the stemcell ID
 func (s Image) ID() apiv1.StemcellCID { return s.id }
 
+// Delete removes the stemcell image
 func (s Image) Delete() error {
 	s.logger.Debug("Image", "Deleting stemcell '%s'", s.id)
 

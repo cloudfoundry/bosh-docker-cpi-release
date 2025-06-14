@@ -1,0 +1,8 @@
+---
+# Ops file to disable TLS when using local Docker (unix socket or non-TLS TCP)
+
+- type: remove
+  path: /instance_groups/name=bosh/properties/docker_cpi/docker/tls?
+
+- type: remove
+  path: /cloud_provider/properties/docker_cpi/docker/tls?

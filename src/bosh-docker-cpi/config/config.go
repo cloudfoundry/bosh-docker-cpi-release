@@ -9,22 +9,26 @@ import (
 	boshsys "github.com/cloudfoundry/bosh-utils/system"
 )
 
+// Config holds configuration settings for the Docker CPI
 type Config struct {
 	Actions FactoryOpts
 
 	StartContainersWithSystemD bool `json:"start_containers_with_systemd"`
 }
 
+// DockerOpts contains Docker connection configuration
 type DockerOpts struct {
 	Host       string
 	APIVersion string `json:"api_version"`
 	TLS        DockerOptsTLS
 }
 
+// RequiresTLS returns true if TLS is required for this Docker connection
 func (o DockerOpts) RequiresTLS() bool {
 	return !strings.HasPrefix(o.Host, "unix://")
 }
 
+// Validate checks that the Docker options are valid
 func (o DockerOpts) Validate() error {
 	if o.Host == "" {
 		return bosherr.Error("Must provide non-empty Host")
@@ -51,17 +55,20 @@ func (o DockerOpts) Validate() error {
 	return nil
 }
 
+// DockerOptsTLS contains TLS configuration for Docker connections
 type DockerOptsTLS struct {
 	CA          string
 	Certificate string
 	PrivateKey  string `json:"private_key"`
 }
 
+// FactoryOpts contains options for creating CPI factories
 type FactoryOpts struct {
 	Docker DockerOpts
 	Agent  apiv1.AgentOptions
 }
 
+// Validate checks that the factory options are valid
 func (o FactoryOpts) Validate() error {
 	err := o.Docker.Validate()
 	if err != nil {
@@ -76,6 +83,7 @@ func (o FactoryOpts) Validate() error {
 	return nil
 }
 
+// NewConfigFromPath loads configuration from a file path
 func NewConfigFromPath(path string, fs boshsys.FileSystem) (Config, error) {
 	var config Config
 
@@ -97,6 +105,7 @@ func NewConfigFromPath(path string, fs boshsys.FileSystem) (Config, error) {
 	return config, nil
 }
 
+// Validate checks that the configuration is valid
 func (c Config) Validate() error {
 	err := c.Actions.Validate()
 	if err != nil {

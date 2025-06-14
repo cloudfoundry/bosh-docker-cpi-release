@@ -1,0 +1,7 @@
+---
+# Override the stemcell to use the one we uploaded
+- type: replace
+  path: /resource_pools/name=vms/stemcell?
+  value:
+    url: ((stemcell_url))
+    sha1: ((stemcell_sha1))
