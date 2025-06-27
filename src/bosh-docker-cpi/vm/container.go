@@ -6,17 +6,18 @@ import (
 	"strings"
 	"time"
 
-	bdisk "bosh-docker-cpi/disk"
-
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
+	cerrdefs "github.com/containerd/errdefs"
 	dkrtypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	dkrnet "github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 	dkrclient "github.com/docker/docker/client"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
+
+	bdisk "bosh-docker-cpi/disk"
 )
 
 const UpdateSettingsPath = "/var/vcap/bosh/update_settings.json"
@@ -83,7 +84,7 @@ func (c Container) Delete() error {
 
 	err = c.dkrClient.VolumeRemove(context.TODO(), EphemeralDiskCID{c.id}.AsString(), true)
 	if err != nil {
-		if !dkrclient.IsErrNotFound(err) {
+		if !cerrdefs.IsNotFound(err) {
 			return bosherr.WrapErrorf(err, "Deleting ephemeral volume")
 		}
 	}
@@ -94,7 +95,7 @@ func (c Container) Delete() error {
 func (c Container) Exists() (bool, error) {
 	_, err := c.dkrClient.ContainerInspect(context.TODO(), c.id.AsString())
 	if err != nil {
-		if dkrclient.IsErrNotFound(err) {
+		if cerrdefs.IsNotFound(err) {
 			return false, nil
 		}
 

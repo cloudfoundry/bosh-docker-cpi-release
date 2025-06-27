@@ -6,6 +6,7 @@ import (
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
+	cerrdefs "github.com/containerd/errdefs"
 	dkrclient "github.com/docker/docker/client"
 )
 
@@ -37,7 +38,7 @@ func (s Volume) Delete() error {
 func (s Volume) Exists() (bool, error) {
 	_, err := s.dkrClient.VolumeInspect(context.TODO(), s.id.AsString())
 	if err != nil {
-		if dkrclient.IsErrNotFound(err) {
+		if cerrdefs.IsNotFound(err) {
 			return false, nil
 		}
 
