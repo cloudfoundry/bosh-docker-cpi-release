@@ -3,9 +3,9 @@ package vm
 import (
 	"archive/tar"
 	"bytes"
-	"fmt"
 	"io"
 	"path/filepath"
+	"time"
 
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
@@ -75,9 +75,8 @@ func (s *fileService) Upload(destinationPath string, contents []byte) error {
 		return bosherr.WrapError(err, "Creating tar")
 	}
 
-	err = s.mkdir(destinationDirName)
-	if err != nil {
-		return bosherr.WrapError(err, "Creating directory")
+	if err = s.dockerExecNoOutput("mkdir", "-p", destinationDirName); err != nil {
+		return bosherr.WrapErrorf(err, "Creating directory '%s'", destinationDirName)
 	}
 
 	copyOpts := container.CopyToContainerOptions{}
@@ -90,13 +89,39 @@ func (s *fileService) Upload(destinationPath string, contents []byte) error {
 	return nil
 }
 
-func (s *fileService) mkdir(dirName string) error {
-	execProcess, err := s.dkrClient.ContainerExecCreate(context.TODO(), s.vmCID.AsString(), container.ExecOptions{Cmd: []string{"bash", "-c", fmt.Sprintf("mkdir -p %s", dirName)}})
+func (s *fileService) dockerExecNoOutput(args ...string) error {
+	// 5 minutes is an arbitrary defensive upper bound on command completion
+	// In practice this method should be completing in <hundreds of milliseconds
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	execProcess, err := s.dkrClient.ContainerExecCreate(ctx, s.vmCID.AsString(), container.ExecOptions{Cmd: args})
 	if err != nil {
-		return err
+		return bosherr.WrapErrorf(err, "Creating docker exec create response")
 	}
 
-	return s.dkrClient.ContainerExecStart(context.TODO(), execProcess.ID, container.ExecStartOptions{})
+	if err = s.dkrClient.ContainerExecStart(ctx, execProcess.ID, container.ExecStartOptions{}); err != nil {
+		return bosherr.WrapErrorf(err, "Starting to docker exec")
+	}
+
+	for {
+		inspectResp, err := s.dkrClient.ContainerExecInspect(ctx, execProcess.ID)
+		if err != nil {
+			return bosherr.WrapErrorf(err, "Inspecting docker exec response")
+		}
+
+		if inspectResp.Running {
+			// Small idle time to avoid busy loop
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+
+		if inspectResp.ExitCode != 0 {
+			return bosherr.Errorf("%v failed [exit status %d]", args, inspectResp.ExitCode)
+		}
+
+		return nil
+	}
 }
 
 func (s *fileService) tarReader(fileName string, contents []byte) (io.Reader, error) {
