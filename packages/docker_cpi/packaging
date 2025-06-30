@@ -10,6 +10,10 @@ fi
 
 source ${pkg_dir}/bosh/compile.env
 
+# Override GOCACHE to use a writable directory for all platforms during packaging
+export GOCACHE="${TMPDIR:-/tmp}/go-build-cache-$$"
+mkdir -p "$GOCACHE"
+
 mkdir ../src && cp -a * ../src/ && mv ../src ./src
 
 mkdir -p $BOSH_INSTALL_TARGET/bin

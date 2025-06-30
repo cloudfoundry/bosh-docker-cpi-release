@@ -1,7 +1,7 @@
 package vm
 
 import (
-	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
@@ -16,12 +16,17 @@ import (
 	dkrnet "github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 	dkrclient "github.com/docker/docker/client"
+	cerrdefs "github.com/docker/docker/errdefs"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+// UpdateSettingsPath is the path to the BOSH update settings file
 const UpdateSettingsPath = "/var/vcap/bosh/update_settings.json"
-const DnsRecordsPath = "/var/vcap/instance/dns/records.json"
 
+// DNSRecordsPath is the path to the DNS records file
+const DNSRecordsPath = "/var/vcap/instance/dns/records.json"
+
+// Container represents a Docker container as a VM
 type Container struct {
 	id apiv1.VMCID
 
@@ -31,12 +36,15 @@ type Container struct {
 	logger boshlog.Logger
 }
 
+// EphemeralDiskCID represents an ephemeral disk ID
 type EphemeralDiskCID struct {
 	id apiv1.VMCID
 }
 
+// AsString returns the string representation of the ephemeral disk ID
 func (c EphemeralDiskCID) AsString() string { return "vol-eph-" + c.id.AsString() }
 
+// NewContainer creates a new Container with the given dependencies
 func NewContainer(
 	id apiv1.VMCID,
 	dkrClient *dkrclient.Client,
@@ -53,8 +61,10 @@ func NewContainer(
 	}
 }
 
+// ID returns the container ID
 func (c Container) ID() apiv1.VMCID { return c.id }
 
+// Delete removes the container and its ephemeral disk
 func (c Container) Delete() error {
 	exists, err := c.Exists()
 	if err != nil {
@@ -69,8 +79,12 @@ func (c Container) Delete() error {
 
 		rmOpts := container.RemoveOptions{Force: true}
 
+		// Create context for removal operations
+		removeCtx, removeCancel := ContextWithTimeout(DefaultDockerTimeout)
+		defer removeCancel()
+
 		// todo handle 'device or resource busy' error?
-		err = c.dkrClient.ContainerRemove(context.TODO(), c.id.AsString(), rmOpts)
+		err = c.dkrClient.ContainerRemove(removeCtx, c.id.AsString(), rmOpts)
 		if err != nil {
 			// todo how to best handle rootfs removal e.g.:
 			// ... remove root filesystem xxx-removing: device or resource busy
@@ -81,9 +95,12 @@ func (c Container) Delete() error {
 		}
 	}
 
-	err = c.dkrClient.VolumeRemove(context.TODO(), EphemeralDiskCID{c.id}.AsString(), true)
+	volumeCtx, volumeCancel := ContextWithTimeout(ShortDockerTimeout)
+	defer volumeCancel()
+
+	err = c.dkrClient.VolumeRemove(volumeCtx, EphemeralDiskCID{c.id}.AsString(), true)
 	if err != nil {
-		if !dkrclient.IsErrNotFound(err) {
+		if !cerrdefs.IsNotFound(err) {
 			return bosherr.WrapErrorf(err, "Deleting ephemeral volume")
 		}
 	}
@@ -91,10 +108,14 @@ func (c Container) Delete() error {
 	return nil
 }
 
+// Exists checks if the container exists
 func (c Container) Exists() (bool, error) {
-	_, err := c.dkrClient.ContainerInspect(context.TODO(), c.id.AsString())
+	inspectCtx, inspectCancel := ContextWithTimeout(ShortDockerTimeout)
+	defer inspectCancel()
+
+	_, err := c.dkrClient.ContainerInspect(inspectCtx, c.id.AsString())
 	if err != nil {
-		if dkrclient.IsErrNotFound(err) {
+		if cerrdefs.IsNotFound(err) {
 			return false, nil
 		}
 
@@ -109,7 +130,11 @@ func (c Container) tryKilling() error {
 
 	// Try multiple times to avoid 'EOF' errors
 	for i := 0; i < 20; i++ {
-		lastErr = c.dkrClient.ContainerKill(context.TODO(), c.id.AsString(), "KILL")
+		// Create context for each kill attempt
+		killCtx, killCancel := ContextWithTimeout(ShortDockerTimeout)
+		lastErr = c.dkrClient.ContainerKill(killCtx, c.id.AsString(), "KILL")
+		killCancel()
+
 		if lastErr == nil {
 			return nil
 		}
@@ -124,6 +149,7 @@ func (c Container) tryKilling() error {
 	return bosherr.WrapError(lastErr, "Killing container")
 }
 
+// AttachDisk attaches a persistent disk to the container
 func (c Container) AttachDisk(disk bdisk.Disk) (apiv1.DiskHint, error) {
 	exists, err := c.Exists()
 	if err != nil {
@@ -145,7 +171,7 @@ func (c Container) AttachDisk(disk bdisk.Disk) (apiv1.DiskHint, error) {
 	if err != nil {
 		c.logger.Warn("attach-disk", "Unable to find update_settings.json skipping: %s", err)
 	}
-	dnsRecords, err := fileService.Download(DnsRecordsPath)
+	dnsRecords, err := fileService.Download(DNSRecordsPath)
 	if err != nil {
 		c.logger.Warn("attach-disk", "Unable to find records.json skipping: %s", err)
 	}
@@ -171,19 +197,30 @@ func (c Container) AttachDisk(disk bdisk.Disk) (apiv1.DiskHint, error) {
 		}
 	}
 	if len(dnsRecords) > 0 {
-		err = fileService.Upload(DnsRecordsPath, dnsRecords)
+		// Ensure the DNS directory exists in the new container
+		dnsDir := filepath.Dir(DNSRecordsPath)
+		err = c.runInContainer(fmt.Sprintf("mkdir -p %s && chown vcap:vcap %s", dnsDir, dnsDir))
 		if err != nil {
-			return apiv1.DiskHint{}, bosherr.WrapError(err, "Restoring records.json")
-		}
-		err = c.runInContainer("chgrp vcap " + DnsRecordsPath)
-		if err != nil {
-			return apiv1.DiskHint{}, bosherr.WrapError(err, "chgrp records.json")
+			c.logger.Warn("attach-disk", "Failed to create DNS directory: %s", err)
+			// Continue anyway, as DNS records are optional
+		} else {
+			err = fileService.Upload(DNSRecordsPath, dnsRecords)
+			if err != nil {
+				// Log warning but don't fail, as DNS records are optional for container operation
+				c.logger.Warn("attach-disk", "Failed to restore records.json: %s", err)
+			} else {
+				err = c.runInContainer("chgrp vcap " + DNSRecordsPath)
+				if err != nil {
+					c.logger.Warn("attach-disk", "Failed to chgrp records.json: %s", err)
+				}
+			}
 		}
 	}
 
 	return diskHint, nil
 }
 
+// DetachDisk detaches a persistent disk from the container
 func (c Container) DetachDisk(disk bdisk.Disk) error {
 	exists, err := c.Exists()
 	if err != nil {
@@ -205,7 +242,7 @@ func (c Container) DetachDisk(disk bdisk.Disk) error {
 	if err != nil {
 		c.logger.Warn("detach-disk", "Unable to find update_settings.json skipping: %s", err)
 	}
-	dnsRecords, err := fileService.Download(DnsRecordsPath)
+	dnsRecords, err := fileService.Download(DNSRecordsPath)
 	if err != nil {
 		c.logger.Warn("detach-disk", "Unable to find records.json skipping: %s", err)
 	}
@@ -230,9 +267,23 @@ func (c Container) DetachDisk(disk bdisk.Disk) error {
 		}
 	}
 	if len(dnsRecords) > 0 {
-		err = fileService.Upload(DnsRecordsPath, dnsRecords)
+		// Ensure the DNS directory exists in the new container
+		dnsDir := filepath.Dir(DNSRecordsPath)
+		err = c.runInContainer(fmt.Sprintf("mkdir -p %s && chown vcap:vcap %s", dnsDir, dnsDir))
 		if err != nil {
-			return bosherr.WrapError(err, "Restoring records.json")
+			c.logger.Warn("detach-disk", "Failed to create DNS directory: %s", err)
+			// Continue anyway, as DNS records are optional
+		} else {
+			err = fileService.Upload(DNSRecordsPath, dnsRecords)
+			if err != nil {
+				// Log warning but don't fail, as DNS records are optional for container operation
+				c.logger.Warn("detach-disk", "Failed to restore records.json: %s", err)
+			} else {
+				err = c.runInContainer("chgrp vcap " + DNSRecordsPath)
+				if err != nil {
+					c.logger.Warn("detach-disk", "Failed to chgrp records.json: %s", err)
+				}
+			}
 		}
 	}
 
@@ -240,7 +291,10 @@ func (c Container) DetachDisk(disk bdisk.Disk) error {
 }
 
 func (c Container) restartByRecreating(diskID apiv1.DiskCID, diskPath string) error {
-	conf, err := c.dkrClient.ContainerInspect(context.TODO(), c.id.AsString())
+	inspectCtx, inspectCancel := ContextWithTimeout(ShortDockerTimeout)
+	defer inspectCancel()
+
+	conf, err := c.dkrClient.ContainerInspect(inspectCtx, c.id.AsString())
 	if err != nil {
 		return bosherr.WrapError(err, "Inspecting container")
 	}
@@ -269,22 +323,34 @@ func (c Container) restartByRecreating(diskID apiv1.DiskCID, diskPath string) er
 	platform.OS = "linux"
 	platform.Architecture = "amd64"
 
+	createCtx, createCancel := ContextWithTimeout(DefaultDockerTimeout)
+	defer createCancel()
+
 	_, err = c.dkrClient.ContainerCreate(
-		context.TODO(), conf.Config, conf.HostConfig, netConfig, &platform, c.id.AsString())
+		createCtx, conf.Config, conf.HostConfig, netConfig, &platform, c.id.AsString())
 	if err != nil {
 		return bosherr.WrapError(err, "Creating container")
 	}
 
 	for name, endPtConfig := range additionalEndPtConfigs {
-		err := c.dkrClient.NetworkConnect(context.TODO(), name, c.id.AsString(), endPtConfig)
+		networkCtx, networkCancel := ContextWithTimeout(ShortDockerTimeout)
+		err := c.dkrClient.NetworkConnect(networkCtx, name, c.id.AsString(), endPtConfig)
+		networkCancel()
 		if err != nil {
 			return bosherr.WrapErrorf(err, "Connecting container to network '%s'", name)
 		}
 	}
 
-	err = c.dkrClient.ContainerStart(context.TODO(), c.id.AsString(), container.StartOptions{})
+	startCtx, startCancel := ContextWithTimeout(DefaultDockerTimeout)
+	defer startCancel()
+
+	err = c.dkrClient.ContainerStart(startCtx, c.id.AsString(), container.StartOptions{})
 	if err != nil {
-		c.Delete() //nolint:errcheck
+		// Attempt cleanup, but prioritize the original error
+		if deleteErr := c.Delete(); deleteErr != nil {
+			// Log cleanup failure but return the original error
+			c.logger.Warn("Container", "Failed to cleanup container after start failure: %s", deleteErr.Error())
+		}
 		return bosherr.WrapError(err, "Starting container")
 	}
 
@@ -292,12 +358,18 @@ func (c Container) restartByRecreating(diskID apiv1.DiskCID, diskPath string) er
 }
 
 func (c Container) runInContainer(cmd string) error {
-	execProcess, err := c.dkrClient.ContainerExecCreate(context.TODO(), c.id.AsString(), container.ExecOptions{Cmd: []string{"bash", "-c", cmd}})
+	execCtx, execCancel := ContextWithTimeout(ShortDockerTimeout)
+	defer execCancel()
+
+	execProcess, err := c.dkrClient.ContainerExecCreate(execCtx, c.id.AsString(), container.ExecOptions{Cmd: []string{"bash", "-c", cmd}})
 	if err != nil {
 		return err
 	}
 
-	return c.dkrClient.ContainerExecStart(context.TODO(), execProcess.ID, container.ExecStartOptions{})
+	startCtx, startCancel := ContextWithTimeout(ShortDockerTimeout)
+	defer startCancel()
+
+	return c.dkrClient.ContainerExecStart(startCtx, execProcess.ID, container.ExecStartOptions{})
 }
 
 func (Container) updateBinds(binds []string, diskID apiv1.DiskCID, diskPath string) []string {
@@ -328,7 +400,10 @@ func (Container) copyNetworks(conf dkrtypes.ContainerJSON) *dkrnet.NetworkingCon
 }
 
 func (c Container) findNodeWithDisk(diskID apiv1.DiskCID) (string, error) {
-	resp, err := c.dkrClient.VolumeList(context.TODO(), volume.ListOptions{})
+	listCtx, listCancel := ContextWithTimeout(ShortDockerTimeout)
+	defer listCancel()
+
+	resp, err := c.dkrClient.VolumeList(listCtx, volume.ListOptions{})
 	if err != nil {
 		return "", bosherr.WrapError(err, "Listing volumes")
 	}

@@ -8,11 +8,13 @@ import (
 	bvm "bosh-docker-cpi/vm"
 )
 
+// AttachDiskMethod handles attaching persistent disks to VMs
 type AttachDiskMethod struct {
 	vmFinder   bvm.Finder
 	diskFinder bdisk.Finder
 }
 
+// NewAttachDiskMethod creates a new AttachDiskMethod with the given VM and disk finders
 func NewAttachDiskMethod(vmFinder bvm.Finder, diskFinder bdisk.Finder) AttachDiskMethod {
 	return AttachDiskMethod{
 		vmFinder:   vmFinder,
@@ -20,11 +22,13 @@ func NewAttachDiskMethod(vmFinder bvm.Finder, diskFinder bdisk.Finder) AttachDis
 	}
 }
 
+// AttachDisk attaches a persistent disk to a VM (v1 API)
 func (a AttachDiskMethod) AttachDisk(vmCID apiv1.VMCID, diskCID apiv1.DiskCID) error {
 	_, err := a.AttachDiskV2(vmCID, diskCID)
 	return err
 }
 
+// AttachDiskV2 attaches a persistent disk to a VM and returns disk hint (v2 API)
 func (a AttachDiskMethod) AttachDiskV2(vmCID apiv1.VMCID, diskCID apiv1.DiskCID) (apiv1.DiskHint, error) {
 	vm, err := a.vmFinder.Find(vmCID)
 	if err != nil {

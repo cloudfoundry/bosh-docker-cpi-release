@@ -1,0 +1,7 @@
+---
+- type: replace
+  path: /networks/name=default/subnets/0/reserved?
+  value:
+    - 10.245.0.1-10.245.0.20  # Reserve IPs for infrastructure
+
+

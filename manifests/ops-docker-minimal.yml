@@ -1,0 +1,12 @@
+# Minimal Docker BPM Compatibility Ops File
+# This adds only the essential BPM compatibility settings for Docker
+
+# Add global BPM Docker compatibility flags
+- type: replace
+  path: /instance_groups/name=bosh/properties?/bpm?/docker_compatibility?
+  value: true
+
+# Add Docker CPI specific BPM settings  
+- type: replace
+  path: /instance_groups/name=bosh/properties?/docker_cpi?/bpm_privileged_mode?
+  value: true

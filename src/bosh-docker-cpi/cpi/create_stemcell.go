@@ -7,14 +7,17 @@ import (
 	bstem "bosh-docker-cpi/stemcell"
 )
 
+// CreateStemcellMethod handles creating stemcells from images
 type CreateStemcellMethod struct {
 	stemcellImporter bstem.Importer
 }
 
+// NewCreateStemcellMethod creates a new CreateStemcellMethod with the given stemcell importer
 func NewCreateStemcellMethod(stemcellImporter bstem.Importer) CreateStemcellMethod {
 	return CreateStemcellMethod{stemcellImporter: stemcellImporter}
 }
 
+// CreateStemcell creates a stemcell from the specified image path
 func (a CreateStemcellMethod) CreateStemcell(
 	imagePath string, _ apiv1.StemcellCloudProps) (apiv1.StemcellCID, error) {
 

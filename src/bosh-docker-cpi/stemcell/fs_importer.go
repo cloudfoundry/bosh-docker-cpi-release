@@ -18,6 +18,7 @@ import (
 	dkrclient "github.com/docker/docker/client"
 )
 
+// FSImporter imports stemcells from filesystem paths as Docker images
 type FSImporter struct {
 	dkrClient *dkrclient.Client
 
@@ -28,6 +29,7 @@ type FSImporter struct {
 	logger boshlog.Logger
 }
 
+// NewFSImporter creates a new FSImporter with the given dependencies
 func NewFSImporter(
 	dkrClient *dkrclient.Client,
 	fs boshsys.FileSystem,
@@ -45,6 +47,7 @@ func NewFSImporter(
 	}
 }
 
+// ImportFromPath imports a stemcell from the given filesystem path
 func (i FSImporter) ImportFromPath(imagePath string) (Stemcell, error) {
 	i.logger.Debug(i.logTag, "Importing stemcell from path '%s'", imagePath)
 

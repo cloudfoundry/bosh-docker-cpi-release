@@ -14,6 +14,7 @@ type fsAgentEnvService struct {
 	logger boshlog.Logger
 }
 
+// NewFSAgentEnvService creates a new filesystem-based agent environment service
 func NewFSAgentEnvService(fileService FileService, logger boshlog.Logger) AgentEnvService {
 	return fsAgentEnvService{
 		fileService:  fileService,
