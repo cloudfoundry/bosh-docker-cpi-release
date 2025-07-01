@@ -223,7 +223,7 @@ func (f Factory) cleanMounts(vmProps Props) Props {
 
 	for i := range vmProps.HostConfig.Mounts { //nolint:staticcheck
 		// Strip off unix socket from sources for convenience of configuration
-		if strings.HasPrefix(vmProps.HostConfig.Mounts[i].Source, unixSock) { //nolint:gosimple,staticcheck
+		if strings.HasPrefix(vmProps.HostConfig.Mounts[i].Source, unixSock) { //nolint:staticcheck
 			vmProps.HostConfig.Mounts[i].Source =
 				strings.TrimPrefix(vmProps.HostConfig.Mounts[i].Source, unixSock)
 		}
