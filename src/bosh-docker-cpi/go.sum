@@ -8,8 +8,8 @@ github.com/cenkalti/backoff/v4 v4.2.1 h1:y4OZtCnogmCPw98Zjyt5a6+QwPLGkiQsYW5oUqy
 github.com/cenkalti/backoff/v4 v4.2.1/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/charlievieth/fs v0.0.3 h1:3lZQXTj4PbE81CVPwALSn+JoyCNXkZgORHN6h2XHGlg=
 github.com/charlievieth/fs v0.0.3/go.mod h1:hD4sRzto1Hw8zCua76tNVKZxaeZZr1RiKftjAJQRLLo=
-github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250614100106-eac403aec066 h1:TBmUKRYQtzOon9zF9/NYTieoIuRDrW4BYYx2gQzJ7/4=
-github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250614100106-eac403aec066/go.mod h1:nGvw6aaY7a/zc/OmQC0elT8RSNjQGI6vKKHMOHW80oM=
+github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250628100319-02573e18faff h1:MCATGOyjS0cuOW85giHz8iK1tVoMLeWOcPjh9Sz4pZQ=
+github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250628100319-02573e18faff/go.mod h1:H/cCvd6tXoKKlEjOE1k66uc4juQxVeSoZ8xDwIY+tEw=
 github.com/cloudfoundry/bosh-utils v0.0.547 h1:k8HDfgXNOFooNeZGB2sFPvaBR2qQ3l5T1sT6yJ2wb2U=
 github.com/cloudfoundry/bosh-utils v0.0.547/go.mod h1:jn/HJq3BECMAV1p6sYbpnIaF8hbIsGfrWF4wL5M9R4M=
 github.com/containerd/errdefs v1.0.0 h1:tg5yIfIlQIrxYtu9ajqY42W3lpS19XqdxRQeEwYG8PI=
@@ -23,8 +23,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/distribution/reference v0.6.0 h1:0IXCQ5g4/QMHHkarYzh5l+u8T3t73zM5QvfrDyIgxBk=
 github.com/distribution/reference v0.6.0/go.mod h1:BbU0aIcezP1/5jX/8MP0YiH4SdvB5Y4f/wlDRiLyi3E=
-github.com/docker/docker v28.3.0+incompatible h1:ffS62aKWupCWdvcee7nBU9fhnmknOqDPaJAMtfK0ImQ=
-github.com/docker/docker v28.3.0+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
+github.com/docker/docker v28.3.1+incompatible h1:20+BmuA9FXlCX4ByQ0vYJcUEnOmRM6XljDnFWR+jCyY=
+github.com/docker/docker v28.3.1+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/go-connections v0.5.0 h1:USnMq7hx7gwdVZq1L49hLXaFtUdTADjXGp+uj1Br63c=
 github.com/docker/go-connections v0.5.0/go.mod h1:ov60Kzw0kKElRwhNs9UlUHAE/F9Fe6GLaXnqyDdmEXc=
 github.com/docker/go-units v0.5.0 h1:69rxXcBk27SvSaaxTtLh/8llcHD8vYHT7WSdRZ/jvr4=

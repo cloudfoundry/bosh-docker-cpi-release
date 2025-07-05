@@ -11,7 +11,7 @@ github.com/bmatcuk/doublestar
 # github.com/charlievieth/fs v0.0.3
 ## explicit; go 1.18
 github.com/charlievieth/fs
-# github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250614100106-eac403aec066
+# github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250628100319-02573e18faff
 ## explicit; go 1.23.0
 github.com/cloudfoundry/bosh-cpi-go/apiv1
 github.com/cloudfoundry/bosh-cpi-go/rpc
@@ -33,7 +33,7 @@ github.com/containerd/errdefs/pkg/internal/cause
 # github.com/distribution/reference v0.6.0
 ## explicit; go 1.20
 github.com/distribution/reference
-# github.com/docker/docker v28.3.0+incompatible
+# github.com/docker/docker v28.3.1+incompatible
 ## explicit
 github.com/docker/docker/api
 github.com/docker/docker/api/types
