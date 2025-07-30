@@ -11,11 +11,11 @@ github.com/bmatcuk/doublestar
 # github.com/charlievieth/fs v0.0.3
 ## explicit; go 1.18
 github.com/charlievieth/fs
-# github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250712100150-51dcc456ff42
+# github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250730141734-5fdead57b33f
 ## explicit; go 1.23.0
 github.com/cloudfoundry/bosh-cpi-go/apiv1
 github.com/cloudfoundry/bosh-cpi-go/rpc
-# github.com/cloudfoundry/bosh-utils v0.0.551
+# github.com/cloudfoundry/bosh-utils v0.0.552
 ## explicit; go 1.23.0
 github.com/cloudfoundry/bosh-utils/errors
 github.com/cloudfoundry/bosh-utils/logger
@@ -33,7 +33,7 @@ github.com/containerd/errdefs/pkg/internal/cause
 # github.com/distribution/reference v0.6.0
 ## explicit; go 1.20
 github.com/distribution/reference
-# github.com/docker/docker v28.3.2+incompatible
+# github.com/docker/docker v28.3.3+incompatible
 ## explicit
 github.com/docker/docker/api
 github.com/docker/docker/api/types
@@ -127,7 +127,7 @@ github.com/onsi/ginkgo/v2/internal/parallel_support
 github.com/onsi/ginkgo/v2/internal/testingtproxy
 github.com/onsi/ginkgo/v2/reporters
 github.com/onsi/ginkgo/v2/types
-# github.com/onsi/gomega v1.36.3
+# github.com/onsi/gomega v1.37.0
 ## explicit; go 1.23.0
 github.com/onsi/gomega
 github.com/onsi/gomega/format
