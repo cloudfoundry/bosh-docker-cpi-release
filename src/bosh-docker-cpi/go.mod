@@ -4,9 +4,9 @@ go 1.23.0
 
 require (
 	github.com/cloudfoundry/bosh-cpi-go v0.0.0-20250823100110-f8e580f1eb3a
-	github.com/cloudfoundry/bosh-utils v0.0.554
+	github.com/cloudfoundry/bosh-utils v0.0.555
 	github.com/containerd/errdefs v1.0.0
-	github.com/docker/docker v28.3.3+incompatible
+	github.com/docker/docker v28.4.0+incompatible
 	github.com/docker/go-connections v0.6.0
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
@@ -26,7 +26,6 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
-	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/pprof v0.0.0-20250630185457-6e76a2b096b5 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
