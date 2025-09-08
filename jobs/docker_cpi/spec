@@ -39,5 +39,8 @@ properties:
     description: "Options for the blobstore used by deployed BOSH agents"
     default: {}
   docker_cpi.start_containers_with_systemd:
-    description: "Containers will use /sbin/init as the entry point. Enabling this is required for Noble stemcells, but currently breaks all pre-Noble stemcells"
+    description: "Containers will use /sbin/init as the entry point. Enabling this is required for Noble stemcells."
+    default: false
+  docker_cpi.enable_lxcfs_support:
+    description: "Enable LXCFS support for containers"
     default: false
