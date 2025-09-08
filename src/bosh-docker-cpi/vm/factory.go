@@ -79,23 +79,39 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		Env:          []string{"reschedule:on-node-failure"},
 	}
 
+	// todo hacky umount to avoid conflicting with bosh dns updates
+	// todo why perms are wrong on /var/vcap/data
+	// todo dont need to create /var/vcap/store
+
+	commonInitCmds := []string{
+		`umount /etc/resolv.conf`,
+		`umount /etc/hosts`,
+		`umount /etc/hostname`,
+		networkInitBashCmd,
+		`rm -rf /var/vcap/data/sys`,
+		`mkdir -p /var/vcap/data/sys`,
+		`mkdir -p /var/vcap/store`,
+		"sed -i 's/chronyc/# chronyc/g' /var/vcap/bosh/bin/sync-time",
+	}
+
 	if f.Config.StartContainersWithSystemD {
-		containerConfig.Entrypoint = dkrstrslice.StrSlice{"sbin/init"}
+		// only load minimal set of systemd units / services
+		// https://github.com/asg1612/docker-systemd/blob/master/Dockerfile
+		removeNonCriticalSystemdServices := `find /etc/systemd/system ` +
+			`/lib/systemd/system -path '*.wants/*' -not -name '*journald*' ` +
+			`-not -name '*systemd-tmpfiles*' -not -name '*systemd-user-sessions*' ` +
+			`-not -name '*runit*' -exec rm \{} \;`
+
+		systemdInitCmds := []string{
+			`rm -rf /etc/sv/{ssh,rsyslog,cron}`,
+			`rm -rf /etc/service/{ssh,rsyslog,cron}`,
+			removeNonCriticalSystemdServices,
+			`/sbin/init`,
+		}
+
+		containerConfig.Cmd = dkrstrslice.StrSlice{"bash", "-c", strings.Join(append(commonInitCmds, systemdInitCmds...), " && ")}
 	} else {
-		// todo hacky umount to avoid conflicting with bosh dns updates
-		// todo why perms are wrong on /var/vcap/data
-		// todo dont need to create /var/vcap/store
-		containerConfig.Cmd = dkrstrslice.StrSlice{"bash", "-c", strings.Join([]string{
-			`umount /etc/resolv.conf`,
-			`umount /etc/hosts`,
-			`umount /etc/hostname`,
-			networkInitBashCmd,
-			`rm -rf /var/vcap/data/sys`,
-			`mkdir -p /var/vcap/data/sys`,
-			`mkdir -p /var/vcap/store`,
-			"sed -i 's/chronyc/# chronyc/g' /var/vcap/bosh/bin/sync-time",
-			`exec env -i /usr/sbin/runsvdir-start`,
-		}, " && ")}
+		containerConfig.Cmd = dkrstrslice.StrSlice{"bash", "-c", strings.Join(append(commonInitCmds, `exec env -i /usr/sbin/runsvdir-start`), " && ")}
 	}
 
 	if len(diskCIDs) > 0 {
@@ -120,7 +136,25 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 
 	vmProps = f.cleanMounts(vmProps)
 
-	vmProps.HostConfig.Binds = []string{EphemeralDiskCID{id}.AsString() + ":/var/vcap/data/"} //nolint:staticcheck
+	binds := []string{
+		EphemeralDiskCID{id}.AsString() + ":/var/vcap/data/",
+		// Ensure kernel modules can be matched/loaded if host kernel != stemcell kernel
+		"/lib/modules:/usr/lib/modules",
+	} //nolint:staticcheck
+
+	if f.Config.EnableLXCFSSupport {
+		binds = append(binds, []string{
+			"/var/lib/lxcfs/proc/cpuinfo:/proc/cpuinfo:rw",
+			"/var/lib/lxcfs/proc/diskstats:/proc/diskstats:rw",
+			"/var/lib/lxcfs/proc/loadavg:/proc/loadavg:rw",
+			"/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw",
+			"/var/lib/lxcfs/proc/stat:/proc/stat:rw",
+			"/var/lib/lxcfs/proc/swaps:/proc/swaps:rw",
+			"/var/lib/lxcfs/proc/uptime:/proc/uptime:rw",
+		}...) //nolint:staticcheck
+	}
+
+	vmProps.HostConfig.Binds = binds //nolint:staticcheck
 
 	f.logger.Debug(f.logTag, "Creating container %#v, host %#v", containerConfig, &vmProps.HostConfig)
 

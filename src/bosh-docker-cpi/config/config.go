@@ -13,6 +13,7 @@ type Config struct {
 	Actions FactoryOpts
 
 	StartContainersWithSystemD bool `json:"start_containers_with_systemd"`
+	EnableLXCFSSupport         bool `json:"enable_lxcfs_support"`
 }
 
 type DockerOpts struct {
