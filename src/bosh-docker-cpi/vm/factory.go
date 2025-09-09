@@ -103,8 +103,8 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			`-not -name '*runit*' -exec rm \{} \;`
 
 		systemdInitCmds := []string{
-			`rm -rf /etc/sv/{ssh,rsyslog,cron}`,
-			`rm -rf /etc/service/{ssh,rsyslog,cron}`,
+			`rm -rf /etc/sv/{ssh,cron}`,
+			`rm -rf /etc/service/{ssh,cron}`,
 			removeNonCriticalSystemdServices,
 			`/sbin/init`,
 		}
