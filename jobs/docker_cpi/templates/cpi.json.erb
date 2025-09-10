@@ -2,6 +2,7 @@
 
 config = {
   "start_containers_with_systemd" => p("docker_cpi.start_containers_with_systemd"),
+  "enable_lxcfs_support" => p("docker_cpi.enable_lxcfs_support"),
   "Actions" => {
     "Docker" => {
       "host"        => p("docker_cpi.docker.host"),
