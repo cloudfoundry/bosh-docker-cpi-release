@@ -59,6 +59,22 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		return Container{}, bosherr.WrapError(err, "Unmarshaling VM properties")
 	}
 
+	startContainersWithSystemD := f.Config.StartContainersWithSystemD
+	if vmProps.ForceStartWithSystemD {
+		startContainersWithSystemD = true
+	}
+	if vmProps.ForceStartWithoutSystemD {
+		startContainersWithSystemD = false
+	}
+
+	lxcfsEnabled := f.Config.EnableLXCFSSupport
+	if vmProps.ForceLXCFSEnabled {
+		lxcfsEnabled = true
+	}
+	if vmProps.ForceLXCFSDisabled {
+		lxcfsEnabled = false
+	}
+
 	networkInitBashCmd, netConfig, err := NewNetworks(f.dkrClient, f.uuidGen, networks).Enable()
 	if err != nil {
 		return nil, bosherr.WrapError(err, "Enabling networks")
@@ -94,7 +110,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		"sed -i 's/chronyc/# chronyc/g' /var/vcap/bosh/bin/sync-time",
 	}
 
-	if f.Config.StartContainersWithSystemD {
+	if startContainersWithSystemD {
 		// only load minimal set of systemd units / services
 		// https://github.com/asg1612/docker-systemd/blob/master/Dockerfile
 		removeNonCriticalSystemdServices := `find /etc/systemd/system ` +
@@ -103,10 +119,10 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			`-not -name '*runit*' -exec rm \{} \;`
 
 		systemdInitCmds := []string{
-			`rm -rf /etc/sv/{ssh,rsyslog,cron}`,
-			`rm -rf /etc/service/{ssh,rsyslog,cron}`,
+			`rm -rf /etc/sv/{ssh,cron}`,
+			`rm -rf /etc/service/{ssh,cron}`,
 			removeNonCriticalSystemdServices,
-			`/sbin/init`,
+			`exec /sbin/init`,
 		}
 
 		containerConfig.Cmd = dkrstrslice.StrSlice{"bash", "-c", strings.Join(append(commonInitCmds, systemdInitCmds...), " && ")}
@@ -142,15 +158,9 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		"/lib/modules:/usr/lib/modules",
 	} //nolint:staticcheck
 
-	if f.Config.EnableLXCFSSupport {
+	if lxcfsEnabled {
 		binds = append(binds, []string{
-			"/var/lib/lxcfs/proc/cpuinfo:/proc/cpuinfo:rw",
-			"/var/lib/lxcfs/proc/diskstats:/proc/diskstats:rw",
-			"/var/lib/lxcfs/proc/loadavg:/proc/loadavg:rw",
 			"/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw",
-			"/var/lib/lxcfs/proc/stat:/proc/stat:rw",
-			"/var/lib/lxcfs/proc/swaps:/proc/swaps:rw",
-			"/var/lib/lxcfs/proc/uptime:/proc/uptime:rw",
 		}...) //nolint:staticcheck
 	}
 
@@ -185,7 +195,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		return Container{}, bosherr.WrapError(err, "Starting container")
 	}
 
-	if f.Config.StartContainersWithSystemD {
+	if startContainersWithSystemD {
 		execProcess, err := f.dkrClient.ContainerExecCreate(context.TODO(), id.AsString(), dkrcont.ExecOptions{Cmd: []string{"bash", "-c", "umount /etc/hosts"}})
 		if err != nil {
 			f.cleanUpContainer(container)
