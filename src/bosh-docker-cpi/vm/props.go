@@ -12,6 +12,11 @@ type Props struct {
 	// ./src/github.com/docker/engine-api/types/container/host_config.go
 	dkrcont.HostConfig `json:",inline"`
 	specs.Platform
+
+	ForceStartWithSystemD    bool `json:"force_start_with_systemd"`
+	ForceStartWithoutSystemD bool `json:"force_start_without_systemd"`
+	ForceLXCFSEnabled        bool `json:"force_lxcfs_enabled"`
+	ForceLXCFSDisabled       bool `json:"force_lxcfs_disabled"`
 }
 
 type NetProps struct {
