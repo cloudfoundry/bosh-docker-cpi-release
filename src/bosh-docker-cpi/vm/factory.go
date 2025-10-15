@@ -195,20 +195,6 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		return Container{}, bosherr.WrapError(err, "Starting container")
 	}
 
-	if startContainersWithSystemD {
-		execProcess, err := f.dkrClient.ContainerExecCreate(context.TODO(), id.AsString(), dkrcont.ExecOptions{Cmd: []string{"bash", "-c", "umount /etc/hosts"}})
-		if err != nil {
-			f.cleanUpContainer(container)
-			return Container{}, bosherr.WrapError(err, "Creating exec")
-		}
-
-		err = f.dkrClient.ContainerExecStart(context.TODO(), execProcess.ID, dkrcont.ExecStartOptions{})
-		if err != nil {
-			f.cleanUpContainer(container)
-			return Container{}, bosherr.WrapError(err, "Starting exec")
-		}
-	}
-
 	agentEnv := apiv1.AgentEnvFactory{}.ForVM(agentID, id, networks, env, f.agentOptions)
 	agentEnv.AttachSystemDisk(apiv1.NewDiskHintFromString(""))
 
