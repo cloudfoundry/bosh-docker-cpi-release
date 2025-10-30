@@ -116,7 +116,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		removeNonCriticalSystemdServices := `find /etc/systemd/system ` +
 			`/lib/systemd/system -path '*.wants/*' -not -name '*journald*' ` +
 			`-not -name '*systemd-tmpfiles*' -not -name '*systemd-user-sessions*' ` +
-			`-not -name '*runit*' -exec rm \{} \;`
+			`-not -name '*runit*' -not -name '*bosh-agent*' -exec rm \{} \;`
 
 		systemdInitCmds := []string{
 			`rm -rf /etc/sv/{ssh,cron}`,
