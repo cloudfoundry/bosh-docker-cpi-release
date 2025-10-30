@@ -10,6 +10,11 @@ fi
 
 source ${pkg_dir}/bosh/compile.env
 
+# Since HOME is not set we must set GOPATH and GOCACHE
+mkdir -p /tmp/go/.cache
+export GOPATH=/tmp/go
+export GOCACHE=${GOPATH}/.cache
+
 mkdir ../src && cp -a * ../src/ && mv ../src ./src
 
 mkdir -p $BOSH_INSTALL_TARGET/bin
