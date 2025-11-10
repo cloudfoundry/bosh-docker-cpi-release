@@ -114,7 +114,8 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		// only load minimal set of systemd units / services
 		// https://github.com/asg1612/docker-systemd/blob/master/Dockerfile
 		removeNonCriticalSystemdServices := `find /etc/systemd/system ` +
-			`/lib/systemd/system -path '*.wants/*' -not -name '*journald*' ` +
+			`/lib/systemd/system -path '*.wants/*'` +
+			`-not -name '*journald*' -not -name '*logrotate*'` +
 			`-not -name '*systemd-tmpfiles*' -not -name '*systemd-user-sessions*' ` +
 			`-not -name '*runit*' -not -name '*bosh-agent*' -exec rm \{} \;`
 
