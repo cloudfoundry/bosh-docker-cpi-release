@@ -183,6 +183,7 @@ function main() {
     -o ../bosh-deployment/docker/cpi.yml \
     -o ../bosh-deployment/docker/use-jammy.yml \
     -o ../bosh-deployment/jumpbox-user.yml \
+    -o ../bosh-deployment/misc/source-releases/bosh.yml \
     -o manifests/dev.yml \
     -v director_name=docker \
     -v docker_cpi_path=$cpi_path \
