@@ -117,7 +117,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			`/lib/systemd/system -path '*.wants/*'` +
 			`-not -name '*journald*' -not -name '*logrotate*'` +
 			`-not -name '*systemd-tmpfiles*' -not -name '*systemd-user-sessions*' ` +
-			`-not -name '*runit*' -not -name '*bosh-agent*' -exec rm \{} \;`
+			`-not -name '*runit*' -not -name '*bosh-agent*' -not -name '*ssh*' -exec rm \{} \;`
 
 		systemdInitCmds := []string{
 			`rm -rf /etc/sv/{ssh,cron}`,
