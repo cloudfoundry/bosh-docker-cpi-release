@@ -3,6 +3,7 @@ package vm
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"io"
 	"path/filepath"
 	"time"
@@ -12,7 +13,6 @@ import (
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
 	"github.com/docker/docker/api/types/container"
 	dkrclient "github.com/docker/docker/client"
-	"golang.org/x/net/context"
 )
 
 type FileService interface {
