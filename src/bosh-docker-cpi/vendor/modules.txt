@@ -14,11 +14,11 @@ github.com/bmatcuk/doublestar
 # github.com/charlievieth/fs v0.0.3
 ## explicit; go 1.18
 github.com/charlievieth/fs
-# github.com/cloudfoundry/bosh-cpi-go v0.0.0-20251122100313-2fa7f6430744
+# github.com/cloudfoundry/bosh-cpi-go v0.0.0-20251129100329-f7d76fb6e32e
 ## explicit; go 1.24.0
 github.com/cloudfoundry/bosh-cpi-go/apiv1
 github.com/cloudfoundry/bosh-cpi-go/rpc
-# github.com/cloudfoundry/bosh-utils v0.0.572
+# github.com/cloudfoundry/bosh-utils v0.0.575
 ## explicit; go 1.24.0
 github.com/cloudfoundry/bosh-utils/errors
 github.com/cloudfoundry/bosh-utils/logger
