@@ -26,6 +26,7 @@ github.com/cloudfoundry/bosh-cpi-go/rpc
 github.com/cloudfoundry/bosh-utils/errors
 github.com/cloudfoundry/bosh-utils/logger
 github.com/cloudfoundry/bosh-utils/system
+github.com/cloudfoundry/bosh-utils/system/fakes
 github.com/cloudfoundry/bosh-utils/uuid
 # github.com/containerd/errdefs v1.0.0
 ## explicit; go 1.20
@@ -253,5 +254,8 @@ golang.org/x/tools/internal/versions
 ## explicit; go 1.21
 # google.golang.org/grpc v1.67.1
 ## explicit; go 1.21
+# gopkg.in/yaml.v3 v3.0.1
+## explicit
+gopkg.in/yaml.v3
 # gotest.tools/v3 v3.1.0
 ## explicit; go 1.11
