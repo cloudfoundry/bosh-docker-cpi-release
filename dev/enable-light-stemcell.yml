@@ -1,0 +1,5 @@
+---
+- type: replace
+  path: /instance_groups/name=bosh/jobs/name=docker_cpi/properties/docker_cpi/light_stemcell?
+  value:
+    require_image_verification: false

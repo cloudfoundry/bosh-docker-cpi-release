@@ -1,0 +1,68 @@
+# Stage 1: Build the CPI binary
+FROM golang:1.25 AS builder
+
+# Add build arg to force rebuild
+ARG CACHE_BUST=unknown
+
+WORKDIR /build
+COPY src/bosh-docker-cpi /build
+
+# Download dependencies and build
+RUN go mod download
+RUN go mod tidy
+RUN go mod vendor
+RUN echo "Building at: $(date)" && echo "Cache bust: $CACHE_BUST"
+RUN CGO_ENABLED=0 GOOS=linux go build -o /cpi ./main
+
+# Stage 2: Create custom instant-bosh image
+FROM ghcr.io/rkoster/instant-bosh:main
+
+# First, remove the existing CPI binary to ensure we're not using cached layers
+RUN rm -f /var/vcap/packages/docker_cpi/bin/cpi-linux
+
+# Copy the compiled CPI binary to the BOSH packages directory (where it's actually executed from)
+COPY --from=builder /cpi /var/vcap/packages/docker_cpi/bin/cpi-linux
+RUN chmod +x /var/vcap/packages/docker_cpi/bin/cpi-linux
+
+# Copy job spec and template files
+COPY jobs/docker_cpi/spec /var/vcap/jobs/docker_cpi/spec
+COPY jobs/docker_cpi/templates/cpi.erb /var/vcap/jobs/docker_cpi/templates/
+COPY jobs/docker_cpi/templates/cpi.json.erb /var/vcap/jobs/docker_cpi/templates/
+COPY jobs/docker_cpi/templates/cpi_ctl.erb /var/vcap/jobs/docker_cpi/templates/
+
+# Create required directories
+RUN mkdir -p /var/vcap/jobs/docker_cpi/config && \
+    mkdir -p /var/vcap/jobs/docker_cpi/packages
+
+# Patch job.MF to add light_stemcell properties
+RUN awk '/docker_cpi\.start_containers_with_systemd:/ { \
+      print; \
+      getline; print; \
+      getline; print; \
+      print "  docker_cpi.light_stemcell.require_image_verification:"; \
+      print "    description: \"Require SHA256 verification when pulling Docker images for light stemcells\""; \
+      print "    default: true"; \
+      next \
+    } 1' /var/vcap/jobs/docker_cpi/job.MF > /tmp/job.MF && \
+    mv /tmp/job.MF /var/vcap/jobs/docker_cpi/job.MF
+
+# Patch .bosh-job-metadata.json to add light_stemcell properties
+RUN python3 -c "import json; \
+    f = open('/var/vcap/jobs/docker_cpi/.bosh-job-metadata.json', 'r'); \
+    data = json.load(f); \
+    f.close(); \
+    data['properties']['docker_cpi.light_stemcell.require_image_verification'] = {'description': 'Require SHA256 verification when pulling Docker images for light stemcells', 'default': True}; \
+    f = open('/var/vcap/jobs/docker_cpi/.bosh-job-metadata.json', 'w'); \
+    json.dump(data, f, indent=2); \
+    f.close()"
+
+# Patch the embedded manifest to enable light stemcell support
+RUN awk '/start_containers_with_systemd: true/ { \
+      print; \
+      print "      light_stemcell:"; \
+      print "        require_image_verification: true"; \
+      next \
+    } 1' /var/vcap/bosh/manifest.yml > /tmp/manifest.yml && \
+    mv /tmp/manifest.yml /var/vcap/bosh/manifest.yml
+
+LABEL description="Custom instant-bosh image with bosh-docker-cpi for testing lite stemcells"
