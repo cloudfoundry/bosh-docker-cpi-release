@@ -44,3 +44,6 @@ properties:
   docker_cpi.enable_lxcfs_support:
     description: "Enable LXCFS support for containers"
     default: false
+  docker_cpi.light_stemcell.require_image_verification:
+    description: "Require SHA256 digest verification for light stemcell images"
+    default: true

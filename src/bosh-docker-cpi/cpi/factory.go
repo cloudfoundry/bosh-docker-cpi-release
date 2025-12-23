@@ -81,7 +81,13 @@ func (f Factory) New(ctx apiv1.CallContext) (apiv1.CPI, error) {
 		return CPI{}, err
 	}
 
-	stemcellImporter := bstem.NewFSImporter(dkrClient, f.fs, f.uuidGen, f.logger)
+	stemcellImporter := bstem.NewCompositeImporter(
+		dkrClient,
+		f.fs,
+		f.uuidGen,
+		f.Config.LightStemcell.RequireImageVerification,
+		f.logger,
+	)
 	stemcellFinder := bstem.NewFSFinder(dkrClient, f.logger)
 	vmFactory := bvm.NewFactory(dkrClient, f.uuidGen, f.opts.Agent, f.logger, f.Config)
 	diskFactory := bdisk.NewFactory(dkrClient, f.uuidGen, f.logger)

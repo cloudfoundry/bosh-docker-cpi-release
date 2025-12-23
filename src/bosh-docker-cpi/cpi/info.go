@@ -12,7 +12,7 @@ func NewInfoMethod() InfoMethod {
 
 func (a InfoMethod) Info() (apiv1.Info, error) {
 	return apiv1.Info{
-		StemcellFormats: []string{"warden-tar", "general-tar"},
+		StemcellFormats: []string{"warden-tar", "general-tar", "docker-light"},
 		APIVersion:      2,
 	}, nil
 }

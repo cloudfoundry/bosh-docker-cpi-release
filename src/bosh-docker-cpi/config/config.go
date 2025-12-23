@@ -12,8 +12,9 @@ import (
 type Config struct {
 	Actions FactoryOpts
 
-	StartContainersWithSystemD bool `json:"start_containers_with_systemd"`
-	EnableLXCFSSupport         bool `json:"enable_lxcfs_support"`
+	StartContainersWithSystemD bool              `json:"start_containers_with_systemd"`
+	EnableLXCFSSupport         bool              `json:"enable_lxcfs_support"`
+	LightStemcell              LightStemcellOpts `json:"light_stemcell"`
 }
 
 type DockerOpts struct {
@@ -56,6 +57,10 @@ type DockerOptsTLS struct {
 	CA          string
 	Certificate string
 	PrivateKey  string `json:"private_key"`
+}
+
+type LightStemcellOpts struct {
+	RequireImageVerification bool `json:"require_image_verification"`
 }
 
 type FactoryOpts struct {
