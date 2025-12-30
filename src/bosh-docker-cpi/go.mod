@@ -11,6 +11,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.27.3
 	github.com/onsi/gomega v1.38.2
 	github.com/opencontainers/image-spec v1.1.1
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

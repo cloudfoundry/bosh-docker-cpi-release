@@ -3,6 +3,9 @@
 config = {
   "start_containers_with_systemd" => p("docker_cpi.start_containers_with_systemd"),
   "enable_lxcfs_support" => p("docker_cpi.enable_lxcfs_support"),
+  "light_stemcell" => {
+    "require_image_verification" => p("docker_cpi.light_stemcell.require_image_verification"),
+  },
   "Actions" => {
     "Docker" => {
       "host"        => p("docker_cpi.docker.host"),

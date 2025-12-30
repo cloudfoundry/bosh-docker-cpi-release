@@ -29,3 +29,7 @@ bat.spec
 *\.test
 *.coverprofile
 *.sublime-workspace
+
+# Development test artifacts
+dev/test-lite-stemcell*.tgz
+*.backup
