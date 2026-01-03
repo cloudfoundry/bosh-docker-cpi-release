@@ -17,7 +17,7 @@ github.com/cespare/xxhash/v2
 # github.com/charlievieth/fs v0.0.3
 ## explicit; go 1.18
 github.com/charlievieth/fs
-# github.com/cloudfoundry/bosh-cpi-go v0.0.0-20251218231106-b786c35e4c00
+# github.com/cloudfoundry/bosh-cpi-go v0.0.0-20251227100157-506fe5f35b83
 ## explicit; go 1.24.0
 github.com/cloudfoundry/bosh-cpi-go/apiv1
 github.com/cloudfoundry/bosh-cpi-go/rpc
@@ -26,7 +26,6 @@ github.com/cloudfoundry/bosh-cpi-go/rpc
 github.com/cloudfoundry/bosh-utils/errors
 github.com/cloudfoundry/bosh-utils/logger
 github.com/cloudfoundry/bosh-utils/system
-github.com/cloudfoundry/bosh-utils/system/fakes
 github.com/cloudfoundry/bosh-utils/uuid
 # github.com/containerd/errdefs v1.0.0
 ## explicit; go 1.20
