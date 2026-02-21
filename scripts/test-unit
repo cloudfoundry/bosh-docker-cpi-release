@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+export REPO_ROOT
+
+"${REPO_ROOT}/scripts/go-generate"
+
+pushd "${REPO_ROOT}/src/bosh-docker-cpi"
+  go run github.com/onsi/ginkgo/v2/ginkgo run --race --randomize-all -r -p ./...
+popd

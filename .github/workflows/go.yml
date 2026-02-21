@@ -19,6 +19,7 @@ jobs:
     - uses: actions/setup-go@v6
       with:
         go-version-file: src/bosh-docker-cpi/go.mod
+    - run: scripts/go-generate
     - uses: golangci/golangci-lint-action@v9
       with:
         working-directory: src/bosh-docker-cpi/
@@ -33,5 +34,4 @@ jobs:
     - uses: actions/setup-go@v6
       with:
         go-version-file: src/bosh-docker-cpi/go.mod
-    - run: go run github.com/onsi/ginkgo/v2/ginkgo -r .
-      working-directory: src/bosh-docker-cpi/
+    - run: scripts/test-unit

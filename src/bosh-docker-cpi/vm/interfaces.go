@@ -7,6 +7,10 @@ import (
 	bstem "bosh-docker-cpi/stemcell"
 )
 
+//go:generate go tool counterfeiter -generate
+
+//counterfeiter:generate . Creator
+
 type Creator interface {
 	Create(apiv1.AgentID, bstem.Stemcell, apiv1.VMCloudProps,
 		apiv1.Networks, []apiv1.DiskCID, apiv1.VMEnv) (VM, error)
@@ -14,11 +18,15 @@ type Creator interface {
 
 var _ Creator = Factory{}
 
+//counterfeiter:generate . Finder
+
 type Finder interface {
 	Find(apiv1.VMCID) (VM, error)
 }
 
 var _ Finder = Factory{}
+
+//counterfeiter:generate . VM
 
 type VM interface {
 	ID() apiv1.VMCID
@@ -31,6 +39,8 @@ type VM interface {
 }
 
 var _ VM = Container{}
+
+//counterfeiter:generate . AgentEnvService
 
 type AgentEnvService interface {
 	// Fetch will return an error if Update was not called beforehand
