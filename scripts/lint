@@ -4,8 +4,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export REPO_ROOT
 
-"${REPO_ROOT}/scripts/lint" # calls scripts/go-generate
+"${REPO_ROOT}/scripts/go-generate"
 
 pushd "${REPO_ROOT}/src/bosh-docker-cpi"
-  go run github.com/onsi/ginkgo/v2/ginkgo run --race --randomize-all -r -p ./...
+  go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run ./...
 popd
