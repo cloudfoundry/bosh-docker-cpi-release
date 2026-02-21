@@ -15,6 +15,8 @@ import (
 	dkrclient "github.com/docker/docker/client"
 )
 
+//counterfeiter:generate . FileService
+
 type FileService interface {
 	Upload(string, []byte) error
 	Download(string) ([]byte, error)

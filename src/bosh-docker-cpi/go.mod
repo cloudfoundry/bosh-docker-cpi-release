@@ -30,6 +30,7 @@ require (
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/pprof v0.0.0-20260202012954-cb029daf43ef // indirect
+	github.com/maxbrunsfeld/counterfeiter/v6 v6.12.1 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/sys/atomicwriter v0.1.0 // indirect
 	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6 // indirect
@@ -55,3 +56,5 @@ require (
 	google.golang.org/grpc v1.67.1 // indirect
 	gotest.tools/v3 v3.1.0 // indirect
 )
+
+tool github.com/maxbrunsfeld/counterfeiter/v6
