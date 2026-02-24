@@ -160,6 +160,12 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	vmProps.HostConfig.Privileged = true      //nolint:staticcheck
 	vmProps.HostConfig.PublishAllPorts = true //nolint:staticcheck
 
+	if startContainersWithSystemD {
+		// systemd requires access to the host cgroup hierarchy to function
+		// properly inside a container, especially with cgroups v2.
+		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModeHost //nolint:staticcheck
+	}
+
 	for _, port := range vmProps.ExposedPorts {
 		containerConfig.ExposedPorts[dkrnat.Port(port)] = struct{}{}
 	}
