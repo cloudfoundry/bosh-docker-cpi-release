@@ -2,6 +2,7 @@ package vm
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"bosh-docker-cpi/config"
@@ -161,8 +162,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	vmProps.HostConfig.PublishAllPorts = true //nolint:staticcheck
 
 	if startContainersWithSystemD {
-		// systemd requires access to the host cgroup hierarchy to function
-		// properly inside a container, especially with cgroups v2.
+		// systemd requires access to the host cgroup hierarchy, especially with cgroups v2.
 		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModeHost //nolint:staticcheck
 	}
 
@@ -173,9 +173,15 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	vmProps = f.cleanMounts(vmProps)
 
 	binds := []string{
-		EphemeralDiskCID{id}.AsString() + ":/var/vcap/data/",
-		// Ensure kernel modules can be matched/loaded if host kernel != stemcell kernel
-		"/lib/modules:/usr/lib/modules",
+		fmt.Sprintf("%s:/var/vcap/data/", EphemeralDiskCID{id}.AsString()),
+		"/lib/modules:/usr/lib/modules", // make host kernel modules accessible
+	}
+
+	if startContainersWithSystemD {
+		// systemd needs read-write access to the cgroup filesystem to manage
+		// service cgroups. Without this mount, systemd may fail to initialize
+		// on cgroups v2 hosts.
+		binds = append(binds, "/sys/fs/cgroup:/sys/fs/cgroup:rw")
 	}
 
 	if lxcfsEnabled {
