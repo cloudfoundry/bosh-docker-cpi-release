@@ -23,6 +23,8 @@ jobs:
       - get: docker-cpi-image
       - get: bosh-cli-registry-image
       - get: bosh-shared-ci
+#      - get: stemcell
+#        resource: ubuntu-noble-stemcell
     - task: build-release
       file: bosh-shared-ci/tasks/release/create-dev-release.yml
       image: bosh-cli-registry-image
@@ -32,6 +34,7 @@ jobs:
         release_tarball: bosh-cpi-dev-artifacts
     - task: integration-test
       file: ci/ci/tasks/setup-director.yml
+#      file: ci/ci/tasks/integration-test.yml
       privileged: true
       image: docker-cpi-image
 
