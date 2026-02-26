@@ -2,6 +2,7 @@ package vm
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"bosh-docker-cpi/config"
@@ -98,8 +99,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	// todo hacky umount to avoid conflicting with bosh dns updates
 	// todo why perms are wrong on /var/vcap/data
 	// todo dont need to create /var/vcap/store
-
-	commonInitCmds := []string{
+	preStartCommands := []string{
 		`umount /etc/resolv.conf`,
 		`umount /etc/hosts`,
 		`umount /etc/hostname`,
@@ -110,26 +110,40 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		"sed -i 's/chronyc/# chronyc/g' /var/vcap/bosh/bin/sync-time",
 	}
 
+	var startContainerCommands []string
+
 	if startContainersWithSystemD {
 		// only load minimal set of systemd units / services
 		// https://github.com/asg1612/docker-systemd/blob/master/Dockerfile
-		removeNonCriticalSystemdServices := `find /etc/systemd/system ` +
-			`/lib/systemd/system -path '*.wants/*'` +
-			`-not -name '*journald*' -not -name '*logrotate*'` +
-			`-not -name '*systemd-tmpfiles*' -not -name '*systemd-user-sessions*' ` +
-			`-not -name '*runit*' -not -name '*bosh-agent*' -not -name '*ssh*' -exec rm \{} \;`
+		deleteUnwantedUnitsCommand := strings.Join([]string{
+			`find`,
+			`/etc/systemd/system`,
+			`/lib/systemd/system`,
+			`-path '*.wants/*' `,
+			`-not -name '*bosh-agent*'`,
+			`-not -name '*journald*'`,
+			`-not -name '*logrotate*' `,
+			`-not -name '*runit*'`,
+			`-not -name '*ssh*'`,
+			`-not -name '*systemd-user-sessions*'`,
+			`-not -name '*systemd-tmpfiles*'`,
+			`-exec rm \{} \;`,
+		}, " ")
 
-		systemdInitCmds := []string{
+		preStartCommands = append(preStartCommands, []string{
 			`rm -rf /etc/sv/{ssh,cron}`,
 			`rm -rf /etc/service/{ssh,cron}`,
-			removeNonCriticalSystemdServices,
-			`exec /sbin/init`,
-		}
+			deleteUnwantedUnitsCommand,
+		}...)
 
-		containerConfig.Cmd = dkrstrslice.StrSlice{"bash", "-c", strings.Join(append(commonInitCmds, systemdInitCmds...), " && ")}
+		startContainerCommands = append(preStartCommands, `exec /sbin/init`)
 	} else {
-		containerConfig.Cmd = dkrstrslice.StrSlice{"bash", "-c", strings.Join(append(commonInitCmds, `exec env -i /usr/sbin/runsvdir-start`), " && ")}
+		preStartCommands = append(preStartCommands, []string{}...)
+
+		startContainerCommands = append(preStartCommands, `exec env -i /usr/sbin/runsvdir-start`)
 	}
+
+	containerConfig.Cmd = dkrstrslice.StrSlice{"bash", "-c", strings.Join(startContainerCommands, " && ")}
 
 	if len(diskCIDs) > 0 {
 		node, err := f.possiblyFindNodeWithDisk(diskCIDs[0])
@@ -147,6 +161,11 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	vmProps.HostConfig.Privileged = true      //nolint:staticcheck
 	vmProps.HostConfig.PublishAllPorts = true //nolint:staticcheck
 
+	if startContainersWithSystemD {
+		// systemd requires access to the host cgroup hierarchy, especially with cgroups v2.
+		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModeHost //nolint:staticcheck
+	}
+
 	for _, port := range vmProps.ExposedPorts {
 		containerConfig.ExposedPorts[dkrnat.Port(port)] = struct{}{}
 	}
@@ -154,15 +173,19 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	vmProps = f.cleanMounts(vmProps)
 
 	binds := []string{
-		EphemeralDiskCID{id}.AsString() + ":/var/vcap/data/",
-		// Ensure kernel modules can be matched/loaded if host kernel != stemcell kernel
-		"/lib/modules:/usr/lib/modules",
-	} //nolint:staticcheck
+		fmt.Sprintf("%s:/var/vcap/data/", EphemeralDiskCID{id}.AsString()),
+		"/lib/modules:/usr/lib/modules", // make host kernel modules accessible
+	}
+
+	if startContainersWithSystemD {
+		// systemd needs read-write access to the cgroup filesystem to manage
+		// service cgroups. Without this mount, systemd may fail to initialize
+		// on cgroups v2 hosts.
+		binds = append(binds, "/sys/fs/cgroup:/sys/fs/cgroup:rw")
+	}
 
 	if lxcfsEnabled {
-		binds = append(binds, []string{
-			"/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw",
-		}...) //nolint:staticcheck
+		binds = append(binds, "/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw")
 	}
 
 	vmProps.HostConfig.Binds = binds //nolint:staticcheck
@@ -218,7 +241,7 @@ func (f Factory) Find(id apiv1.VMCID) (VM, error) {
 }
 
 func (f Factory) cleanUpContainer(container dkrcont.CreateResponse) {
-	// todo be more reselient at removal see Container#Delete()
+	// todo be more resilient at removal see Container#Delete()
 	rmOpts := dkrcont.RemoveOptions{Force: true}
 
 	err := f.dkrClient.ContainerRemove(context.TODO(), container.ID, rmOpts)

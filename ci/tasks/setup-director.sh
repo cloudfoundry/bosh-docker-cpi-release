@@ -1,14 +1,21 @@
 #!/usr/bin/env bash
+set -eu -o pipefail
 
-set -e
+REPO_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/../.." && pwd )"
+REPO_PARENT="$( cd "${REPO_ROOT}/.." && pwd )"
+
 if [[ -n "${DEBUG:-}" ]]; then
   set -x
   export BOSH_LOG_LEVEL=debug
+  export BOSH_LOG_PATH="${BOSH_LOG_PATH:-${REPO_PARENT}/bosh-debug.log}"
 fi
 
-cd "${PWD}/bosh-docker-cpi-release/"
+BOSH_DEPLOYMENT_PATH="${REPO_PARENT}/bosh-deployment"
 
-cpi_path=$(realpath ../bosh-cpi-dev-artifacts/release.tgz)
+export BOSH_DIRECTOR_IP="10.245.0.11"
+export BOSH_ENVIRONMENT="docker-director"
+
+export DNS_IP="8.8.8.8"
 
 function generate_certs() {
   local certs_dir
@@ -113,9 +120,6 @@ function stop_docker() {
 function start_docker() {
   local certs_dir
   certs_dir="${1}"
-  # docker will fail starting with the new iptables. it throws:
-  # iptables v1.8.7 (nf_tables): Could not fetch rule set generation id: ....
-  update-alternatives --set iptables /usr/sbin/iptables-legacy
   generate_certs "${certs_dir}"
   mkdir -p /var/log
   mkdir -p /var/run
@@ -139,7 +143,7 @@ function start_docker() {
   fi
 
   local mtu
-  mtu=$(cat "/sys/class/net/$(ip route get 8.8.8.8|awk '{ print $5 }')/mtu")
+  mtu=$(cat "/sys/class/net/$(ip route get "${DNS_IP}"|awk '{ print $5 }')/mtu")
 
   [[ ! -d /etc/docker ]] && mkdir /etc/docker
   cat <<EOF > /etc/docker/daemon.json
@@ -158,9 +162,6 @@ EOF
   trap stop_docker EXIT
 
   service docker start
-
-  export DOCKER_TLS_VERIFY=1
-  export DOCKER_CERT_PATH=$1
 
   rc=1
   for i in $(seq 1 100); do
@@ -197,36 +198,53 @@ function main() {
     exit 1
   fi
 
-  export DOCKER_HOST="tcp://${OUTER_CONTAINER_IP}:4243"
-
   local certs_dir
   certs_dir=$(mktemp -d)
-  start_docker "${certs_dir}"
 
   local local_bosh_dir
   local_bosh_dir="/tmp/local-bosh/director"
-
-  docker network create -d bridge --subnet=10.245.0.0/16 director_network
-
-  export BOSH_DIRECTOR_IP="10.245.0.11"
-  export BOSH_ENVIRONMENT="docker-director"
-
   mkdir -p ${local_bosh_dir}
 
-  bosh int ../bosh-deployment/bosh.yml \
-    -o ../bosh-deployment/docker/cpi.yml \
-    -o ../bosh-deployment/docker/use-jammy.yml \
-    -o ../bosh-deployment/jumpbox-user.yml \
-    -o ../bosh-deployment/misc/source-releases/bosh.yml \
-    -o manifests/dev.yml \
+  cat <<EOF > "${local_bosh_dir}/docker-env"
+export DOCKER_HOST="tcp://${OUTER_CONTAINER_IP}:4243"
+export DOCKER_TLS_VERIFY=1
+export DOCKER_CERT_PATH="${certs_dir}"
+
+EOF
+  echo "Source '${local_bosh_dir}/docker-env' to run docker" >&2
+  source "${local_bosh_dir}/docker-env"
+
+  start_docker "${certs_dir}"
+
+  local docker_network_name="director_network"
+  local docker_network_cidr="10.245.0.0/16"
+  if docker network ls | grep -q "${docker_network_name}"; then
+    echo "A docker network named '${docker_network_name}' already exists, skipping creation" >&2
+  else
+    docker network create -d bridge --subnet="${docker_network_cidr}" "${docker_network_name}"
+  fi
+
+  cat <<EOF > "${local_bosh_dir}/docker_tls.json"
+{
+  "ca": "$(cat "${certs_dir}/ca_json_safe.pem")",
+  "certificate": "$(cat "${certs_dir}/client_certificate_json_safe.pem")",
+  "private_key": "$(cat "${certs_dir}/client_private_key_json_safe.pem")"
+}
+
+EOF
+
+  bosh int "${BOSH_DEPLOYMENT_PATH}/bosh.yml" \
+    -o "${BOSH_DEPLOYMENT_PATH}/docker/cpi.yml" \
+    -o "${BOSH_DEPLOYMENT_PATH}/jumpbox-user.yml" \
+    -o "${REPO_ROOT}/manifests/dev.yml" \
     -v director_name=docker \
-    -v docker_cpi_path="${cpi_path}" \
-    -v internal_cidr=10.245.0.0/16 \
+    -v internal_cidr="${docker_network_cidr}" \
     -v internal_gw=10.245.0.1 \
     -v internal_ip="${BOSH_DIRECTOR_IP}" \
     -v docker_host="${DOCKER_HOST}" \
-    -v network=director_network \
-    -v docker_tls="{\"ca\": \"$(cat "${certs_dir}/ca_json_safe.pem")\",\"certificate\": \"$(cat "${certs_dir}/client_certificate_json_safe.pem")\",\"private_key\": \"$(cat "${certs_dir}/client_private_key_json_safe.pem")\"}" \
+    -v network="${docker_network_name}" \
+    -v docker_tls="$(cat "${local_bosh_dir}/docker_tls.json")" \
+    -v docker_cpi_path="${REPO_PARENT}/bosh-cpi-dev-artifacts/release.tgz" \
     "${@}" > "${local_bosh_dir}/bosh-director.yml"
 
   bosh create-env "${local_bosh_dir}/bosh-director.yml" \
@@ -234,18 +252,24 @@ function main() {
       --state="${local_bosh_dir}/state.json"
 
   bosh int "${local_bosh_dir}/creds.yml" --path /director_ssl/ca > "${local_bosh_dir}/ca.crt"
+  bosh_client_secret="$(bosh int "${local_bosh_dir}/creds.yml" --path /admin_password)"
+
   bosh -e "${BOSH_DIRECTOR_IP}" --ca-cert "${local_bosh_dir}/ca.crt" alias-env "${BOSH_ENVIRONMENT}"
 
   cat <<EOF > "${local_bosh_dir}/env"
+  export BOSH_DIRECTOR_IP="${BOSH_DIRECTOR_IP}"
   export BOSH_ENVIRONMENT="${BOSH_ENVIRONMENT}"
   export BOSH_CLIENT=admin
-  export BOSH_CLIENT_SECRET=$(bosh int "${local_bosh_dir}/creds.yml" --path /admin_password)
+  export BOSH_CLIENT_SECRET=${bosh_client_secret}
   export BOSH_CA_CERT="${local_bosh_dir}/ca.crt"
 
 EOF
 
+  echo "Source '${local_bosh_dir}/env' to run bosh" >&2
   source "${local_bosh_dir}/env"
-  bosh -n update-cloud-config ../bosh-deployment/docker/cloud-config.yml -v network=director_network
+
+  bosh -n update-cloud-config "${BOSH_DEPLOYMENT_PATH}/docker/cloud-config.yml" \
+    -v network="${docker_network_name}"
 
 }
 

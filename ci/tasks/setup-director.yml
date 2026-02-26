@@ -7,6 +7,3 @@ inputs:
   - name: bosh-cpi-dev-artifacts
 run:
   path: ci/ci/tasks/setup-director.sh
-params:
-  BOSH_INIT_LOG_LEVEL:            warn
-
