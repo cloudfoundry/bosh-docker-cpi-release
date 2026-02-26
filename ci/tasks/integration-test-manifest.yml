@@ -1,0 +1,34 @@
+name: ((deployment_name))
+
+instance_groups:
+  - name: "test-instance"
+    azs:
+      - z1
+    instances: 1
+    networks:
+      - name: default
+    stemcell: noble
+    vm_type: default
+    jobs:
+      - name: post-deploy-script
+        release: os-conf
+        properties:
+          script: |-
+            #!/bin/bash
+            echo success
+
+releases:
+  - name: os-conf
+    url: "https://bosh.io/d/github.com/cloudfoundry/os-conf-release"
+    version: latest
+
+stemcells:
+  - alias: noble
+    os: ubuntu-noble
+    version: latest
+
+update:
+  canaries: 0
+  canary_watch_time: 1000-60000
+  max_in_flight: 100%
+  update_watch_time: 1000-60000

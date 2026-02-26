@@ -79,8 +79,7 @@ function sanitize_cgroups() {
 
   mount -o remount,rw /sys/fs/cgroup
 
-  # shellcheck disable=SC2034
-  sed -e 1d /proc/cgroups | while read -r sys hierarchy num enabled; do
+  sed -e 1d /proc/cgroups | while read -r sys enabled; do
     if [ "$enabled" != "1" ]; then
       # subsystem disabled; skip
       continue
@@ -271,6 +270,15 @@ EOF
   bosh -n update-cloud-config "${BOSH_DEPLOYMENT_PATH}/docker/cloud-config.yml" \
     -v network="${docker_network_name}"
 
+  stemcell_file="$(find "${REPO_PARENT}/stemcell" -maxdepth 1 -path '*.tgz')"
+  bosh -n upload-stemcell "${stemcell_file}"
+
+  deployment_name="integration-test"
+
+  bosh deploy --non-interactive \
+    --deployment "${deployment_name}" \
+    "${REPO_ROOT}/ci/tasks/integration-test-manifest.yml" \
+     --var deployment_name="${deployment_name}"
 }
 
 main "${@}"

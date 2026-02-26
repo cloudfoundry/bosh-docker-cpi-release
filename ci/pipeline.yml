@@ -23,6 +23,8 @@ jobs:
       - get: docker-cpi-image
       - get: bosh-cli-registry-image
       - get: bosh-shared-ci
+#      - get: stemcell
+#        resource: ubuntu-noble-stemcell
     - task: build-release
       file: bosh-shared-ci/tasks/release/create-dev-release.yml
       image: bosh-cli-registry-image
@@ -32,8 +34,40 @@ jobs:
         release_tarball: bosh-cpi-dev-artifacts
     - task: integration-test
       file: ci/ci/tasks/setup-director.yml
+#      file: ci/ci/tasks/integration-test.yml
       privileged: true
       image: docker-cpi-image
+
+  # TODO delete integration-experiment
+  - name: integration-experiment
+    serial: true
+    plan:
+    - in_parallel:
+      - get: bosh-docker-cpi-release
+        resource: bosh-docker-cpi-test
+        trigger: true
+      - get: ci
+        resource: bosh-docker-cpi-test
+      - get: bosh-deployment
+      - get: docker-cpi-image
+      - get: bosh-cli-registry-image
+      - get: bosh-shared-ci
+      - get: stemcell
+        resource: ubuntu-noble-stemcell
+    - task: build-release
+      file: bosh-shared-ci/tasks/release/create-dev-release.yml
+      image: bosh-cli-registry-image
+      input_mapping:
+        release_repo: bosh-docker-cpi-release
+      output_mapping:
+        release_tarball: bosh-cpi-dev-artifacts
+    - task: integration-test
+      file: ci/ci/tasks/integration-test.yml
+      privileged: true
+      image: docker-cpi-image
+      params:
+        DEBUG: true
+  #/TODO delete integration-experiment
 
   - name: automatically-release-new-patch
     serial_groups: [version]
@@ -230,6 +264,15 @@ resources:
       private_key: ((github_deploy_key_bosh-docker-cpi-release.private_key))
       branch: master
 
+  # TODO delete bosh-docker-cpi-test
+  - name: bosh-docker-cpi-test
+    type: git
+    source:
+      uri: git@github.com:cloudfoundry/bosh-docker-cpi-release.git
+      private_key: ((github_deploy_key_bosh-docker-cpi-release.private_key))
+      branch: add-test-deploy-to-integration-test
+  #/TODO delete bosh-docker-cpi-test
+
   - name: bosh-shared-ci
     type: git
     source:
@@ -312,8 +355,19 @@ resources:
       username: ((dockerhub_username))
       password: ((dockerhub_password))
 
+  - name: ubuntu-noble-stemcell
+    type: bosh-io-stemcell
+    source:
+      name: bosh-warden-boshlite-ubuntu-noble
+
 resource_types:
 - name: gcs-resource
   type: docker-image
   source:
     repository: frodenas/gcs-resource
+
+- name: bosh-io-stemcell
+  source:
+    repository: foundationalinfrastructure/bosh-io-stemcell-resource
+    tag: v1.2.1
+  type: docker-image
