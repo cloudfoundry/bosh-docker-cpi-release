@@ -367,66 +367,76 @@ EOF
 
   deployment_name="integration-test"
 
+  docker events --format '{{.Time}} {{.Type}} {{.Action}} {{.Actor.Attributes.name}} {{.Actor.ID}}' > /tmp/docker-events.log 2>&1 &
+  local docker_events_pid=$!
+
   if ! bosh deploy --non-interactive \
     --deployment "${deployment_name}" \
     "${REPO_ROOT}/ci/tasks/integration-test-manifest.yml" \
      --var deployment_name="${deployment_name}"; then
 
+    kill "${docker_events_pid}" 2>/dev/null || true
+    wait "${docker_events_pid}" 2>/dev/null || true
+
     echo ""
     echo "=== DEPLOYMENT FAILED - COLLECTING DIAGNOSTICS ==="
     echo ""
 
+    echo "--- Docker events during deploy ---"
+    cat /tmp/docker-events.log 2>&1 || true
+
+    echo ""
     echo "--- docker ps (all containers, including stopped) ---"
     docker ps -a --format "table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}" || true
 
+    local director_cid=""
     for cid in $(docker ps -a -q); do
       cname=$(docker inspect --format '{{.Name}}' "${cid}" | sed 's|^/||')
       cstatus=$(docker inspect --format '{{.State.Status}}' "${cid}")
       echo ""
       echo "=== Container: ${cname} (${cid}) - Status: ${cstatus} ==="
 
-      echo "--- Container state (full) ---"
-      docker inspect --format 'Status={{.State.Status}} ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}} StartedAt={{.State.StartedAt}} FinishedAt={{.State.FinishedAt}}' "${cid}" 2>&1 || true
-
-      echo "--- Container startup command ---"
-      docker inspect --format '{{.Config.Cmd}}' "${cid}" 2>&1 || true
+      echo "--- Container state ---"
+      docker inspect --format 'ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}} StartedAt={{.State.StartedAt}} FinishedAt={{.State.FinishedAt}}' "${cid}" 2>&1 || true
 
       echo "--- Container HostConfig ---"
       docker inspect --format 'Privileged={{.HostConfig.Privileged}} CgroupnsMode={{.HostConfig.CgroupnsMode}}' "${cid}" 2>&1 || true
 
-      echo "--- Container logs (last 100 lines) ---"
-      docker logs --tail 100 "${cid}" 2>&1 || true
+      echo "--- Container logs (last 50 lines) ---"
+      docker logs --tail 50 "${cid}" 2>&1 || true
 
       if [ "${cstatus}" = "running" ]; then
-        echo "--- /etc/resolv.conf ---"
-        docker exec "${cid}" cat /etc/resolv.conf 2>&1 || true
+        director_cid="${cid}"
 
         echo "--- Processes ---"
         docker exec "${cid}" ps aux 2>&1 | head -30 || true
 
-        echo "--- systemctl status bosh-agent ---"
-        docker exec "${cid}" systemctl status bosh-agent 2>&1 | head -20 || true
-
-        echo "--- BOSH agent log (last 50 lines) ---"
-        docker exec "${cid}" bash -c 'tail -50 /var/vcap/bosh/log/current 2>/dev/null || echo "no agent log found"' 2>&1 || true
-
-        echo "--- Connectivity to director NATS (10.245.0.11:4222) ---"
-        docker exec "${cid}" bash -c 'timeout 5 bash -c "echo > /dev/tcp/10.245.0.11/4222" 2>&1 && echo "NATS port reachable" || echo "NATS port NOT reachable"' 2>&1 || true
+        echo "--- BOSH agent log (last 30 lines) ---"
+        docker exec "${cid}" bash -c 'tail -30 /var/vcap/bosh/log/current 2>/dev/null || echo "no agent log found"' 2>&1 || true
       fi
     done
 
-    echo ""
-    echo "--- ip route on host ---"
-    ip route 2>&1 || true
+    if [ -n "${director_cid}" ]; then
+      echo ""
+      echo "--- Director CPI logs (docker_cpi errors/warnings) ---"
+      docker exec "${director_cid}" bash -c 'grep -i "error\|warn\|fail\|timeout\|create_vm\|delete_vm" /var/vcap/sys/log/cpi/*.log 2>/dev/null | tail -50 || echo "no CPI logs found"' 2>&1 || true
+
+      echo ""
+      echo "--- Director task debug log (last 100 lines) ---"
+      docker exec "${director_cid}" bash -c 'ls -t /var/vcap/data/sys/log/director/*.debug 2>/dev/null | head -1 | xargs tail -100 2>/dev/null || echo "no director debug log found"' 2>&1 || true
+    fi
 
     echo ""
-    echo "--- dmesg (last 30 lines, for OOM/cgroup kills) ---"
+    echo "--- dmesg (last 30 lines) ---"
     dmesg 2>&1 | tail -30 || true
 
     echo ""
     echo "=== END DIAGNOSTICS ==="
     exit 1
   fi
+
+  kill "${docker_events_pid}" 2>/dev/null || true
+  wait "${docker_events_pid}" 2>/dev/null || true
 }
 
 main "${@}"
