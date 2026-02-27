@@ -418,12 +418,20 @@ EOF
 
     if [ -n "${director_cid}" ]; then
       echo ""
-      echo "--- Director CPI logs (docker_cpi errors/warnings) ---"
-      docker exec "${director_cid}" bash -c 'grep -i "error\|warn\|fail\|timeout\|create_vm\|delete_vm" /var/vcap/sys/log/cpi/*.log 2>/dev/null | tail -50 || echo "no CPI logs found"' 2>&1 || true
+      echo "--- Director: find all log files ---"
+      docker exec "${director_cid}" bash -c 'find /var/vcap/sys/log /var/vcap/data/sys/log -name "*.log" -o -name "*.debug" -o -name "current" 2>/dev/null | head -30' 2>&1 || true
 
       echo ""
-      echo "--- Director task debug log (last 100 lines) ---"
-      docker exec "${director_cid}" bash -c 'ls -t /var/vcap/data/sys/log/director/*.debug 2>/dev/null | head -1 | xargs tail -100 2>/dev/null || echo "no director debug log found"' 2>&1 || true
+      echo "--- Director: CPI log (docker_cpi) ---"
+      docker exec "${director_cid}" bash -c 'find /var/vcap -path "*/docker_cpi*" -name "*.log" 2>/dev/null | while read f; do echo "=== $f ==="; tail -50 "$f"; done || echo "no CPI logs"' 2>&1 || true
+
+      echo ""
+      echo "--- Director: latest task debug log (last 100 lines) ---"
+      docker exec "${director_cid}" bash -c 'find /var/vcap -name "*.debug" -newer /var/vcap/bosh 2>/dev/null | sort | tail -1 | xargs tail -100 2>/dev/null || echo "no debug log found"' 2>&1 || true
+
+      echo ""
+      echo "--- Director: CPI request/response for create_vm ---"
+      docker exec "${director_cid}" bash -c 'find /var/vcap -name "*.debug" -newer /var/vcap/bosh 2>/dev/null | sort | tail -1 | xargs grep -A5 "create_vm\|Sent CPI request\|Received CPI response\|External CPI" 2>/dev/null | tail -80 || echo "not found"' 2>&1 || true
     fi
 
     echo ""
