@@ -146,7 +146,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		startContainerCommands = append(preStartCommands, `exec env -i /usr/sbin/runsvdir-start`)
 	}
 
-	containerConfig.Cmd = dkrstrslice.StrSlice{"bash", "-c", strings.Join(startContainerCommands, " && ")}
+	containerConfig.Cmd = dkrstrslice.StrSlice{"bash", "-exc", strings.Join(startContainerCommands, " && ")}
 
 	if len(diskCIDs) > 0 {
 		node, err := f.possiblyFindNodeWithDisk(diskCIDs[0])
