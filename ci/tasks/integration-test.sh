@@ -273,28 +273,56 @@ EOF
       docker logs "${cid}" 2>&1 || true
 
       if [ "${cstatus}" != "running" ]; then
-        echo "--- Attempting to reproduce: run the same image with just /sbin/init ---"
         local image
         image=$(docker inspect --format '{{.Config.Image}}' "${cid}" 2>/dev/null)
+        local binds
+        binds=$(docker inspect --format '{{json .HostConfig.Binds}}' "${cid}" 2>/dev/null)
+        local network_mode
+        network_mode=$(docker inspect --format '{{.HostConfig.NetworkMode}}' "${cid}" 2>/dev/null)
+        echo "--- Failed container config: Image=${image} Binds=${binds} NetworkMode=${network_mode} ---"
+
         if [ -n "${image}" ]; then
-          echo "Image: ${image}"
-          echo "Running: docker run --rm --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw ${image} bash -c 'echo prestart-ok && exec /sbin/init'"
-          docker run --rm -d --name diag-test \
+          echo ""
+          echo "--- Test 1: exact same command as the failed container ---"
+          local orig_cmd
+          orig_cmd=$(docker inspect --format '{{json .Config.Cmd}}' "${cid}" 2>/dev/null)
+          echo "Command: ${orig_cmd}"
+          docker run --rm -d --name diag-exact \
+            --privileged --cgroupns=host \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+            -v /lib/modules:/usr/lib/modules \
+            --network "${network_mode}" \
+            --ip 10.245.0.99 \
+            "${image}" \
+            bash -c 'set -x; umount /etc/resolv.conf; echo "umount resolv rc=$?"; umount /etc/hosts; echo "umount hosts rc=$?"; umount /etc/hostname; echo "umount hostname rc=$?"; echo "prestart-done"; exec /sbin/init' 2>&1 || true
+          sleep 5
+          echo "--- diag-exact status ---"
+          docker ps -a --filter name=diag-exact --format "table {{.ID}}\t{{.Names}}\t{{.Status}}" 2>&1 || true
+          echo "--- diag-exact logs ---"
+          docker logs diag-exact 2>&1 || true
+          diag_status=$(docker inspect --format '{{.State.Status}}' diag-exact 2>/dev/null || echo "unknown")
+          if [ "${diag_status}" = "running" ]; then
+            echo "--- diag-exact: systemd running OK ---"
+            docker exec diag-exact ps aux 2>&1 | head -10 || true
+          else
+            echo "--- diag-exact: container NOT running (status=${diag_status}) ---"
+            docker inspect --format 'ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}}' diag-exact 2>&1 || true
+          fi
+          docker rm -f diag-exact 2>/dev/null || true
+
+          echo ""
+          echo "--- Test 2: minimal /sbin/init (no umounts, no network) ---"
+          docker run --rm -d --name diag-minimal \
             --privileged --cgroupns=host \
             -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
             "${image}" \
-            bash -c 'echo prestart-ok && exec /sbin/init' 2>&1 || true
+            bash -c 'echo minimal-prestart-ok && exec /sbin/init' 2>&1 || true
           sleep 5
-          echo "--- Diagnostic container status ---"
-          docker ps -a --filter name=diag-test --format "table {{.ID}}\t{{.Names}}\t{{.Status}}" 2>&1 || true
-          echo "--- Diagnostic container logs ---"
-          docker logs diag-test 2>&1 || true
-          diag_status=$(docker inspect --format '{{.State.Status}}' diag-test 2>/dev/null || echo "unknown")
-          if [ "${diag_status}" = "running" ]; then
-            echo "--- Diagnostic container: systemd is running, checking processes ---"
-            docker exec diag-test ps aux 2>&1 | head -15 || true
-          fi
-          docker rm -f diag-test 2>/dev/null || true
+          echo "--- diag-minimal status ---"
+          docker ps -a --filter name=diag-minimal --format "table {{.ID}}\t{{.Names}}\t{{.Status}}" 2>&1 || true
+          echo "--- diag-minimal logs ---"
+          docker logs diag-minimal 2>&1 || true
+          docker rm -f diag-minimal 2>/dev/null || true
         fi
       fi
     done
