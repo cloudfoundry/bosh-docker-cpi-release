@@ -370,18 +370,41 @@ EOF
   docker events --format '{{.Time}} {{.Type}} {{.Action}} {{.Actor.Attributes.name}} {{.Actor.ID}}' > /tmp/docker-events.log 2>&1 &
   local docker_events_pid=$!
 
+  # Capture logs from any container that dies during the deploy.
+  # The director will destroy the container after the 600s timeout, so we
+  # need to grab logs between the "die" and "destroy" events.
+  (
+    docker events --filter event=die --format '{{.Actor.Attributes.name}}' 2>/dev/null | while read -r cname; do
+      # Skip the director container
+      if docker ps -q --filter "name=${cname}" 2>/dev/null | grep -q .; then
+        continue
+      fi
+      echo "=== Container ${cname} died - capturing logs ===" >> /tmp/dead-container-logs.txt
+      docker inspect --format 'ExitCode={{.State.ExitCode}} StartedAt={{.State.StartedAt}} FinishedAt={{.State.FinishedAt}}' "${cname}" >> /tmp/dead-container-logs.txt 2>&1 || true
+      docker logs "${cname}" >> /tmp/dead-container-logs.txt 2>&1 || true
+      echo "=== End ${cname} ===" >> /tmp/dead-container-logs.txt
+    done
+  ) &
+  local dead_container_watcher_pid=$!
+
   if ! bosh deploy --non-interactive \
     --deployment "${deployment_name}" \
     "${REPO_ROOT}/ci/tasks/integration-test-manifest.yml" \
      --var deployment_name="${deployment_name}"; then
 
     kill "${docker_events_pid}" 2>/dev/null || true
+    kill "${dead_container_watcher_pid}" 2>/dev/null || true
     wait "${docker_events_pid}" 2>/dev/null || true
+    wait "${dead_container_watcher_pid}" 2>/dev/null || true
 
     echo ""
     echo "=== DEPLOYMENT FAILED - COLLECTING DIAGNOSTICS ==="
     echo ""
 
+    echo "--- Logs from containers that died during deploy ---"
+    cat /tmp/dead-container-logs.txt 2>&1 || echo "(no dead container logs captured)"
+
+    echo ""
     echo "--- Docker events during deploy ---"
     cat /tmp/docker-events.log 2>&1 || true
 
@@ -444,7 +467,9 @@ EOF
   fi
 
   kill "${docker_events_pid}" 2>/dev/null || true
+  kill "${dead_container_watcher_pid}" 2>/dev/null || true
   wait "${docker_events_pid}" 2>/dev/null || true
+  wait "${dead_container_watcher_pid}" 2>/dev/null || true
 }
 
 main "${@}"
