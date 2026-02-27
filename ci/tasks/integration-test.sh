@@ -254,10 +254,6 @@ EOF
     echo "=== CREATE-ENV FAILED - COLLECTING DIAGNOSTICS ==="
     echo ""
 
-    echo ""
-    echo "=== CREATE-ENV FAILED - COLLECTING DIAGNOSTICS ==="
-    echo ""
-
     echo "--- docker ps (all containers, including stopped) ---"
     docker ps -a --format "table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}" || true
 
@@ -267,31 +263,51 @@ EOF
       echo ""
       echo "=== Container: ${cname} (${cid}) - Status: ${cstatus} ==="
 
-      echo "--- Container state (full) ---"
-      docker inspect --format 'Status={{.State.Status}} ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}} StartedAt={{.State.StartedAt}} FinishedAt={{.State.FinishedAt}}' "${cid}" 2>&1 || true
+      echo "--- Container state ---"
+      docker inspect --format 'ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}} StartedAt={{.State.StartedAt}} FinishedAt={{.State.FinishedAt}}' "${cid}" 2>&1 || true
 
-      echo "--- Container startup command ---"
-      docker inspect --format '{{.Config.Cmd}}' "${cid}" 2>&1 || true
-
-      echo "--- Container HostConfig (Privileged, CapAdd, CgroupnsMode) ---"
+      echo "--- Container HostConfig ---"
       docker inspect --format 'Privileged={{.HostConfig.Privileged}} CgroupnsMode={{.HostConfig.CgroupnsMode}}' "${cid}" 2>&1 || true
 
-      echo "--- Container logs (last 100 lines) ---"
-      docker logs --tail 100 "${cid}" 2>&1 || true
+      echo "--- Container logs ---"
+      docker logs "${cid}" 2>&1 || true
 
-      if [ "${cstatus}" = "running" ]; then
-        echo "--- Processes ---"
-        docker exec "${cid}" ps aux 2>&1 | head -30 || true
+      if [ "${cstatus}" != "running" ]; then
+        echo "--- Attempting to reproduce: run the same image with just /sbin/init ---"
+        local image
+        image=$(docker inspect --format '{{.Config.Image}}' "${cid}" 2>/dev/null)
+        if [ -n "${image}" ]; then
+          echo "Image: ${image}"
+          echo "Running: docker run --rm --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw ${image} bash -c 'echo prestart-ok && exec /sbin/init'"
+          docker run --rm -d --name diag-test \
+            --privileged --cgroupns=host \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+            "${image}" \
+            bash -c 'echo prestart-ok && exec /sbin/init' 2>&1 || true
+          sleep 5
+          echo "--- Diagnostic container status ---"
+          docker ps -a --filter name=diag-test --format "table {{.ID}}\t{{.Names}}\t{{.Status}}" 2>&1 || true
+          echo "--- Diagnostic container logs ---"
+          docker logs diag-test 2>&1 || true
+          diag_status=$(docker inspect --format '{{.State.Status}}' diag-test 2>/dev/null || echo "unknown")
+          if [ "${diag_status}" = "running" ]; then
+            echo "--- Diagnostic container: systemd is running, checking processes ---"
+            docker exec diag-test ps aux 2>&1 | head -15 || true
+          fi
+          docker rm -f diag-test 2>/dev/null || true
+        fi
       fi
     done
 
     echo ""
-    echo "--- ip route on host ---"
-    ip route 2>&1 || true
+    echo "--- dmesg (last 50 lines) ---"
+    dmesg 2>&1 | tail -50 || true
 
     echo ""
-    echo "--- dmesg (last 30 lines, for OOM/cgroup kills) ---"
-    dmesg 2>&1 | tail -30 || true
+    echo "--- /sys/fs/cgroup status ---"
+    ls -la /sys/fs/cgroup/ 2>&1 || true
+    cat /sys/fs/cgroup/cgroup.subtree_control 2>&1 || true
+    cat /sys/fs/cgroup/cgroup.controllers 2>&1 || true
 
     echo ""
     echo "=== END CREATE-ENV DIAGNOSTICS ==="
