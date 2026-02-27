@@ -254,48 +254,34 @@ EOF
     echo "=== CREATE-ENV FAILED - COLLECTING DIAGNOSTICS ==="
     echo ""
 
-    echo "--- docker ps (all containers) ---"
+    echo ""
+    echo "=== CREATE-ENV FAILED - COLLECTING DIAGNOSTICS ==="
+    echo ""
+
+    echo "--- docker ps (all containers, including stopped) ---"
     docker ps -a --format "table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}" || true
 
-    echo ""
-    echo "--- docker network inspect director_network ---"
-    docker network inspect director_network 2>&1 || true
-
-    for cid in $(docker ps -q); do
+    for cid in $(docker ps -a -q); do
       cname=$(docker inspect --format '{{.Name}}' "${cid}" | sed 's|^/||')
+      cstatus=$(docker inspect --format '{{.State.Status}}' "${cid}")
       echo ""
-      echo "=== Container: ${cname} (${cid}) ==="
+      echo "=== Container: ${cname} (${cid}) - Status: ${cstatus} ==="
 
-      echo "--- Container IP addresses ---"
-      docker exec "${cid}" ip addr 2>&1 || true
+      echo "--- Container startup command ---"
+      docker inspect --format '{{.Config.Cmd}}' "${cid}" 2>&1 || true
 
-      echo "--- Container routes ---"
-      docker exec "${cid}" ip route 2>&1 || true
+      echo "--- Container logs (last 100 lines) ---"
+      docker logs --tail 100 "${cid}" 2>&1 || true
 
-      echo "--- /etc/resolv.conf ---"
-      docker exec "${cid}" cat /etc/resolv.conf 2>&1 || true
-
-      echo "--- Processes ---"
-      docker exec "${cid}" bash -c 'ps aux | grep -E "init|systemd|bosh|agent|nats|monit" | grep -v grep' 2>&1 || true
-
-      echo "--- systemctl status bosh-agent ---"
-      docker exec "${cid}" systemctl status bosh-agent 2>&1 | head -20 || true
-
-      echo "--- BOSH agent log (last 30 lines) ---"
-      docker exec "${cid}" bash -c 'tail -30 /var/vcap/bosh/log/current 2>/dev/null || echo "no agent log found"' 2>&1 || true
+      if [ "${cstatus}" = "running" ]; then
+        echo "--- Processes ---"
+        docker exec "${cid}" ps aux 2>&1 | head -30 || true
+      fi
     done
-
-    echo ""
-    echo "--- iptables rules on host ---"
-    iptables -L -n 2>&1 | head -60 || true
 
     echo ""
     echo "--- ip route on host ---"
     ip route 2>&1 || true
-
-    echo ""
-    echo "--- Host connectivity to director (10.245.0.11:6868) ---"
-    timeout 5 bash -c "echo > /dev/tcp/10.245.0.11/6868" 2>&1 && echo "mbus port reachable from host" || echo "mbus port NOT reachable from host"
 
     echo ""
     echo "=== END CREATE-ENV DIAGNOSTICS ==="
@@ -336,50 +322,38 @@ EOF
     echo "=== DEPLOYMENT FAILED - COLLECTING DIAGNOSTICS ==="
     echo ""
 
-    echo "--- docker ps (all containers) ---"
+    echo "--- docker ps (all containers, including stopped) ---"
     docker ps -a --format "table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}" || true
 
-    echo ""
-    echo "--- docker network inspect director_network ---"
-    docker network inspect director_network 2>&1 || true
-
-    for cid in $(docker ps -q); do
+    for cid in $(docker ps -a -q); do
       cname=$(docker inspect --format '{{.Name}}' "${cid}" | sed 's|^/||')
+      cstatus=$(docker inspect --format '{{.State.Status}}' "${cid}")
       echo ""
-      echo "=== Container: ${cname} (${cid}) ==="
+      echo "=== Container: ${cname} (${cid}) - Status: ${cstatus} ==="
 
-      echo "--- Startup command ---"
-      docker inspect --format '{{json .Config.Cmd}}' "${cid}" 2>&1 | python3 -m json.tool 2>/dev/null || \
-        docker inspect --format '{{json .Config.Cmd}}' "${cid}" 2>&1 || true
+      echo "--- Container startup command ---"
+      docker inspect --format '{{.Config.Cmd}}' "${cid}" 2>&1 || true
 
-      echo "--- Container IP addresses ---"
-      docker exec "${cid}" ip addr 2>&1 || true
+      echo "--- Container logs (last 100 lines) ---"
+      docker logs --tail 100 "${cid}" 2>&1 || true
 
-      echo "--- Container routes ---"
-      docker exec "${cid}" ip route 2>&1 || true
+      if [ "${cstatus}" = "running" ]; then
+        echo "--- /etc/resolv.conf ---"
+        docker exec "${cid}" cat /etc/resolv.conf 2>&1 || true
 
-      echo "--- /etc/resolv.conf ---"
-      docker exec "${cid}" cat /etc/resolv.conf 2>&1 || true
+        echo "--- Processes ---"
+        docker exec "${cid}" ps aux 2>&1 | head -30 || true
 
-      echo "--- Processes (systemd, bosh-agent, nats) ---"
-      docker exec "${cid}" bash -c 'ps aux | grep -E "init|systemd|bosh|agent|nats|monit" | grep -v grep' 2>&1 || true
+        echo "--- systemctl status bosh-agent ---"
+        docker exec "${cid}" systemctl status bosh-agent 2>&1 | head -20 || true
 
-      echo "--- systemctl status (if systemd) ---"
-      docker exec "${cid}" systemctl status bosh-agent 2>&1 | head -20 || true
+        echo "--- BOSH agent log (last 50 lines) ---"
+        docker exec "${cid}" bash -c 'tail -50 /var/vcap/bosh/log/current 2>/dev/null || echo "no agent log found"' 2>&1 || true
 
-      echo "--- BOSH agent log (last 30 lines) ---"
-      docker exec "${cid}" bash -c 'tail -30 /var/vcap/bosh/log/current 2>/dev/null || echo "no agent log found"' 2>&1 || true
-
-      echo "--- Connectivity to director NATS (10.245.0.11:4222) ---"
-      docker exec "${cid}" bash -c 'timeout 5 bash -c "echo > /dev/tcp/10.245.0.11/4222" 2>&1 && echo "NATS port reachable" || echo "NATS port NOT reachable"' 2>&1 || true
-
-      echo "--- Connectivity to director mbus (10.245.0.11:6868) ---"
-      docker exec "${cid}" bash -c 'timeout 5 bash -c "echo > /dev/tcp/10.245.0.11/6868" 2>&1 && echo "mbus port reachable" || echo "mbus port NOT reachable"' 2>&1 || true
+        echo "--- Connectivity to director NATS (10.245.0.11:4222) ---"
+        docker exec "${cid}" bash -c 'timeout 5 bash -c "echo > /dev/tcp/10.245.0.11/4222" 2>&1 && echo "NATS port reachable" || echo "NATS port NOT reachable"' 2>&1 || true
+      fi
     done
-
-    echo ""
-    echo "--- iptables rules on host ---"
-    iptables -L -n 2>&1 | head -60 || true
 
     echo ""
     echo "--- ip route on host ---"
