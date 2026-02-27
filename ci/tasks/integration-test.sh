@@ -267,8 +267,14 @@ EOF
       echo ""
       echo "=== Container: ${cname} (${cid}) - Status: ${cstatus} ==="
 
+      echo "--- Container state (full) ---"
+      docker inspect --format 'Status={{.State.Status}} ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}} StartedAt={{.State.StartedAt}} FinishedAt={{.State.FinishedAt}}' "${cid}" 2>&1 || true
+
       echo "--- Container startup command ---"
       docker inspect --format '{{.Config.Cmd}}' "${cid}" 2>&1 || true
+
+      echo "--- Container HostConfig (Privileged, CapAdd, CgroupnsMode) ---"
+      docker inspect --format 'Privileged={{.HostConfig.Privileged}} CgroupnsMode={{.HostConfig.CgroupnsMode}}' "${cid}" 2>&1 || true
 
       echo "--- Container logs (last 100 lines) ---"
       docker logs --tail 100 "${cid}" 2>&1 || true
@@ -282,6 +288,10 @@ EOF
     echo ""
     echo "--- ip route on host ---"
     ip route 2>&1 || true
+
+    echo ""
+    echo "--- dmesg (last 30 lines, for OOM/cgroup kills) ---"
+    dmesg 2>&1 | tail -30 || true
 
     echo ""
     echo "=== END CREATE-ENV DIAGNOSTICS ==="
@@ -331,8 +341,14 @@ EOF
       echo ""
       echo "=== Container: ${cname} (${cid}) - Status: ${cstatus} ==="
 
+      echo "--- Container state (full) ---"
+      docker inspect --format 'Status={{.State.Status}} ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}} StartedAt={{.State.StartedAt}} FinishedAt={{.State.FinishedAt}}' "${cid}" 2>&1 || true
+
       echo "--- Container startup command ---"
       docker inspect --format '{{.Config.Cmd}}' "${cid}" 2>&1 || true
+
+      echo "--- Container HostConfig ---"
+      docker inspect --format 'Privileged={{.HostConfig.Privileged}} CgroupnsMode={{.HostConfig.CgroupnsMode}}' "${cid}" 2>&1 || true
 
       echo "--- Container logs (last 100 lines) ---"
       docker logs --tail 100 "${cid}" 2>&1 || true
@@ -358,6 +374,10 @@ EOF
     echo ""
     echo "--- ip route on host ---"
     ip route 2>&1 || true
+
+    echo ""
+    echo "--- dmesg (last 30 lines, for OOM/cgroup kills) ---"
+    dmesg 2>&1 | tail -30 || true
 
     echo ""
     echo "=== END DIAGNOSTICS ==="
