@@ -290,32 +290,42 @@ EOF
               -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
               -v /lib/modules:/usr/lib/modules \
               "${image}" \
-              bash -exc '
-                umount /etc/resolv.conf
+              bash -c '
+                umount /etc/resolv.conf 2>/dev/null
                 printf "%s\n" "nameserver 8.8.8.8" > /etc/resolv.conf
-                umount /etc/hosts
-                umount /etc/hostname
+                umount /etc/hosts 2>/dev/null
+                umount /etc/hostname 2>/dev/null
                 rm -rf /var/vcap/data/sys && mkdir -p /var/vcap/data/sys && mkdir -p /var/vcap/store
-                sed -i "s/chronyc/# chronyc/g" /var/vcap/bosh/bin/sync-time
                 rm -rf /etc/sv/{ssh,cron} && rm -rf /etc/service/{ssh,cron}
                 find /etc/systemd/system /lib/systemd/system -path "*.wants/*" \
                   -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" \
                   -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" \
                   -not -name "*systemd-tmpfiles*" -exec rm {} \;
-                echo "=== pre-init: mount output ==="
-                mount | grep -E "cgroup|tmpfs|proc|sysfs"
-                echo "=== pre-init: /proc/self/cgroup ==="
+                echo "=== /sbin/init target ==="
+                ls -la /sbin/init
+                readlink -f /sbin/init
+                echo "=== systemd version ==="
+                /sbin/init --version 2>&1 || true
+                echo "=== /proc/self/cgroup ==="
                 cat /proc/self/cgroup
-                echo "=== pre-init: cgroup.procs in root ==="
-                cat /sys/fs/cgroup/cgroup.procs 2>/dev/null | head -5 || echo "(not readable)"
-                echo "=== pre-init: cgroup.subtree_control ==="
+                echo "=== cgroup mount ==="
+                mount | grep cgroup
+                echo "=== cgroup root contents ==="
+                ls -la /sys/fs/cgroup/ 2>&1 | head -20
+                echo "=== cgroup.subtree_control ==="
                 cat /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null || echo "(not readable)"
-                echo "=== pre-init: ls /sys/fs/cgroup/system.slice/ ==="
-                ls /sys/fs/cgroup/system.slice/ 2>/dev/null | head -10 || echo "(not found)"
-                echo "=== pre-init: ls /sys/fs/cgroup/init.scope/ ==="
-                ls /sys/fs/cgroup/init.scope/ 2>/dev/null | head -10 || echo "(not found)"
-                echo "=== pre-init: /sys/fs/cgroup/docker/ contents ==="
-                ls /sys/fs/cgroup/docker/ 2>/dev/null | head -10 || echo "(not found)"
+                echo "=== cgroup.procs (first 5) ==="
+                cat /sys/fs/cgroup/cgroup.procs 2>/dev/null | head -5 || echo "(not readable)"
+                echo "=== my cgroup dir ==="
+                MY_CGROUP=$(cat /proc/self/cgroup | cut -d: -f3)
+                echo "my cgroup path: ${MY_CGROUP}"
+                ls -la "/sys/fs/cgroup${MY_CGROUP}/" 2>&1 | head -15 || echo "(not found)"
+                cat "/sys/fs/cgroup${MY_CGROUP}/cgroup.procs" 2>&1 | head -5 || echo "(not readable)"
+                cat "/sys/fs/cgroup${MY_CGROUP}/cgroup.subtree_control" 2>&1 || echo "(not readable)"
+                echo "=== trying to write to my cgroup ==="
+                echo "+cpu +memory +io +pids" > "/sys/fs/cgroup${MY_CGROUP}/cgroup.subtree_control" 2>&1 || echo "FAILED to enable controllers"
+                mkdir -p "/sys/fs/cgroup${MY_CGROUP}/test_subgroup" 2>&1 && echo "mkdir OK" || echo "FAILED to mkdir"
+                rmdir "/sys/fs/cgroup${MY_CGROUP}/test_subgroup" 2>/dev/null
                 echo "=== exec /sbin/init ==="
                 exec /sbin/init --log-level=debug --log-target=console --log-color=no
               ' 2>&1 || true
@@ -330,11 +340,85 @@ EOF
             docker inspect --format 'ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}}' "diag-crash-${attempt}" 2>&1 || true
             echo "--- container logs ---"
             docker logs "diag-crash-${attempt}" 2>&1 || true
-            echo "--- dmesg last 20 lines ---"
-            dmesg 2>&1 | tail -20 || true
+            echo "--- dmesg last 30 lines ---"
+            dmesg 2>&1 | tail -30 || true
             docker rm -f "diag-crash-${attempt}" 2>/dev/null || true
             break
           done
+
+          echo ""
+          echo "--- Test: cgroupns=private x5 ---"
+          local priv_pass=0
+          local priv_fail=0
+          for attempt in $(seq 1 5); do
+            docker run -d --name "diag-priv-${attempt}" \
+              --privileged --cgroupns=private \
+              -v /lib/modules:/usr/lib/modules \
+              "${image}" \
+              bash -c '
+                umount /etc/resolv.conf 2>/dev/null
+                printf "%s\n" "nameserver 8.8.8.8" > /etc/resolv.conf
+                umount /etc/hosts 2>/dev/null
+                umount /etc/hostname 2>/dev/null
+                rm -rf /var/vcap/data/sys && mkdir -p /var/vcap/data/sys && mkdir -p /var/vcap/store
+                rm -rf /etc/sv/{ssh,cron} && rm -rf /etc/service/{ssh,cron}
+                find /etc/systemd/system /lib/systemd/system -path "*.wants/*" \
+                  -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" \
+                  -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" \
+                  -not -name "*systemd-tmpfiles*" -exec rm {} \;
+                mount -o remount,rw /sys/fs/cgroup 2>/dev/null || true
+                exec /sbin/init
+              ' 2>&1 || true
+            sleep 3
+            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-priv-${attempt}" 2>/dev/null || echo "unknown")
+            if [ "${diag_status}" = "running" ]; then
+              priv_pass=$((priv_pass + 1))
+            else
+              priv_fail=$((priv_fail + 1))
+              echo "--- diag-priv-${attempt}: FAILED ---"
+              docker inspect --format 'ExitCode={{.State.ExitCode}}' "diag-priv-${attempt}" 2>&1 || true
+              docker logs --tail 20 "diag-priv-${attempt}" 2>&1 || true
+            fi
+            docker rm -f "diag-priv-${attempt}" 2>/dev/null || true
+          done
+          echo "--- cgroupns=private results: ${priv_pass}/5 passed, ${priv_fail}/5 failed ---"
+
+          echo ""
+          echo "--- Test: cgroupns=host x5 (control) ---"
+          local host_pass=0
+          local host_fail=0
+          for attempt in $(seq 1 5); do
+            docker run -d --name "diag-host-${attempt}" \
+              --privileged --cgroupns=host \
+              -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+              -v /lib/modules:/usr/lib/modules \
+              "${image}" \
+              bash -c '
+                umount /etc/resolv.conf 2>/dev/null
+                printf "%s\n" "nameserver 8.8.8.8" > /etc/resolv.conf
+                umount /etc/hosts 2>/dev/null
+                umount /etc/hostname 2>/dev/null
+                rm -rf /var/vcap/data/sys && mkdir -p /var/vcap/data/sys && mkdir -p /var/vcap/store
+                rm -rf /etc/sv/{ssh,cron} && rm -rf /etc/service/{ssh,cron}
+                find /etc/systemd/system /lib/systemd/system -path "*.wants/*" \
+                  -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" \
+                  -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" \
+                  -not -name "*systemd-tmpfiles*" -exec rm {} \;
+                exec /sbin/init
+              ' 2>&1 || true
+            sleep 3
+            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-host-${attempt}" 2>/dev/null || echo "unknown")
+            if [ "${diag_status}" = "running" ]; then
+              host_pass=$((host_pass + 1))
+            else
+              host_fail=$((host_fail + 1))
+              echo "--- diag-host-${attempt}: FAILED ---"
+              docker inspect --format 'ExitCode={{.State.ExitCode}}' "diag-host-${attempt}" 2>&1 || true
+              docker logs --tail 20 "diag-host-${attempt}" 2>&1 || true
+            fi
+            docker rm -f "diag-host-${attempt}" 2>/dev/null || true
+          done
+          echo "--- cgroupns=host results: ${host_pass}/5 passed, ${host_fail}/5 failed ---"
         fi
       fi
     done
@@ -479,8 +563,20 @@ EOF
     fi
 
     echo ""
-    echo "--- dmesg (last 30 lines) ---"
-    dmesg 2>&1 | tail -30 || true
+    echo "--- iptables rules (filter table) ---"
+    iptables -L -n -v 2>&1 | head -60 || true
+
+    echo ""
+    echo "--- iptables rules (nat table) ---"
+    iptables -t nat -L -n -v 2>&1 | head -40 || true
+
+    echo ""
+    echo "--- iptables rules with cgroup matches ---"
+    iptables-save 2>&1 | grep -i cgroup || echo "(no cgroup iptables rules)"
+
+    echo ""
+    echo "--- dmesg (last 50 lines) ---"
+    dmesg 2>&1 | tail -50 || true
 
     echo ""
     echo "=== END DIAGNOSTICS ==="
