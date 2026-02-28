@@ -223,12 +223,8 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		}
 	}
 
-	err = f.dkrClient.ContainerStart(context.TODO(), id.AsString(), dkrcont.StartOptions{})
-	if err != nil {
-		f.cleanUpContainer(container)
-		return Container{}, bosherr.WrapError(err, "Starting container")
-	}
-
+	// Upload agent env before starting the container to avoid concurrent
+	// docker exec/cp operations that race with systemd's cgroup setup.
 	agentEnv := apiv1.AgentEnvFactory{}.ForVM(agentID, id, networks, env, f.agentOptions)
 	agentEnv.AttachSystemDisk(apiv1.NewDiskHintFromString(""))
 
@@ -239,6 +235,12 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	if err != nil {
 		f.cleanUpContainer(container)
 		return Container{}, bosherr.WrapError(err, "Updating container's agent env")
+	}
+
+	err = f.dkrClient.ContainerStart(context.TODO(), id.AsString(), dkrcont.StartOptions{})
+	if err != nil {
+		f.cleanUpContainer(container)
+		return Container{}, bosherr.WrapError(err, "Starting container")
 	}
 
 	return NewContainer(id, f.dkrClient, agentEnvService, f.logger), nil
