@@ -283,40 +283,56 @@ EOF
 
         if [ -n "${image}" ]; then
           echo ""
-          echo "--- Test: reproduce and strace systemd crash ---"
+          echo "--- Test: capture systemd crash details ---"
           for attempt in $(seq 1 5); do
-            docker run -d --name "diag-strace-${attempt}" \
+            docker run -d --name "diag-crash-${attempt}" \
               --privileged --cgroupns=host \
               -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
               -v /lib/modules:/usr/lib/modules \
               "${image}" \
-              bash -c '
-                umount /etc/resolv.conf 2>/dev/null
+              bash -exc '
+                umount /etc/resolv.conf
                 printf "%s\n" "nameserver 8.8.8.8" > /etc/resolv.conf
-                umount /etc/hosts 2>/dev/null
-                umount /etc/hostname 2>/dev/null
+                umount /etc/hosts
+                umount /etc/hostname
                 rm -rf /var/vcap/data/sys && mkdir -p /var/vcap/data/sys && mkdir -p /var/vcap/store
+                sed -i "s/chronyc/# chronyc/g" /var/vcap/bosh/bin/sync-time
                 rm -rf /etc/sv/{ssh,cron} && rm -rf /etc/service/{ssh,cron}
                 find /etc/systemd/system /lib/systemd/system -path "*.wants/*" \
                   -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" \
                   -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" \
                   -not -name "*systemd-tmpfiles*" -exec rm {} \;
-                apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq strace >/dev/null 2>&1
-                echo "=== strace exec /sbin/init ==="
-                exec strace -f -tt -o /dev/stderr /sbin/init
+                echo "=== pre-init: mount output ==="
+                mount | grep -E "cgroup|tmpfs|proc|sysfs"
+                echo "=== pre-init: /proc/self/cgroup ==="
+                cat /proc/self/cgroup
+                echo "=== pre-init: cgroup.procs in root ==="
+                cat /sys/fs/cgroup/cgroup.procs 2>/dev/null | head -5 || echo "(not readable)"
+                echo "=== pre-init: cgroup.subtree_control ==="
+                cat /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null || echo "(not readable)"
+                echo "=== pre-init: ls /sys/fs/cgroup/system.slice/ ==="
+                ls /sys/fs/cgroup/system.slice/ 2>/dev/null | head -10 || echo "(not found)"
+                echo "=== pre-init: ls /sys/fs/cgroup/init.scope/ ==="
+                ls /sys/fs/cgroup/init.scope/ 2>/dev/null | head -10 || echo "(not found)"
+                echo "=== pre-init: /sys/fs/cgroup/docker/ contents ==="
+                ls /sys/fs/cgroup/docker/ 2>/dev/null | head -10 || echo "(not found)"
+                echo "=== exec /sbin/init ==="
+                exec /sbin/init --log-level=debug --log-target=console --log-color=no
               ' 2>&1 || true
-            sleep 8
-            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-strace-${attempt}" 2>/dev/null || echo "unknown")
+            sleep 5
+            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-crash-${attempt}" 2>/dev/null || echo "unknown")
             if [ "${diag_status}" = "running" ]; then
-              echo "--- diag-strace-${attempt}: systemd running OK ---"
-              docker rm -f "diag-strace-${attempt}" 2>/dev/null || true
+              echo "--- diag-crash-${attempt}: systemd running OK ---"
+              docker rm -f "diag-crash-${attempt}" 2>/dev/null || true
               continue
             fi
-            echo "--- diag-strace-${attempt}: FAILED (status=${diag_status}) ---"
-            docker inspect --format 'ExitCode={{.State.ExitCode}}' "diag-strace-${attempt}" 2>&1 || true
-            echo "--- strace output (last 200 lines) ---"
-            docker logs --tail 200 "diag-strace-${attempt}" 2>&1 || true
-            docker rm -f "diag-strace-${attempt}" 2>/dev/null || true
+            echo "--- diag-crash-${attempt}: FAILED (status=${diag_status}) ---"
+            docker inspect --format 'ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}}' "diag-crash-${attempt}" 2>&1 || true
+            echo "--- container logs ---"
+            docker logs "diag-crash-${attempt}" 2>&1 || true
+            echo "--- dmesg last 20 lines ---"
+            dmesg 2>&1 | tail -20 || true
+            docker rm -f "diag-crash-${attempt}" 2>/dev/null || true
             break
           done
         fi
