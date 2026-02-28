@@ -144,6 +144,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			`echo "=== /proc/1/cgroup: $(cat /proc/1/cgroup 2>&1) ==="`,
 			`echo "=== mount | grep cgroup: $(mount | grep cgroup 2>&1) ==="`,
 			`echo "=== ls /sys/fs/cgroup/: $(ls /sys/fs/cgroup/ 2>&1 | head -20) ==="`,
+			`echo "=== cgroup writable test: $(echo +pids > /sys/fs/cgroup/cgroup.subtree_control 2>&1 && echo OK || echo FAILED) ==="`,
 			`exec /sbin/init --log-level=debug --log-target=console`,
 		)
 	} else {
@@ -171,7 +172,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	vmProps.HostConfig.PublishAllPorts = true //nolint:staticcheck
 
 	if startContainersWithSystemD {
-		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModeHost //nolint:staticcheck
+		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModePrivate //nolint:staticcheck
 		vmProps.HostConfig.Tmpfs = map[string]string{ //nolint:staticcheck
 			"/run":      "",
 			"/run/lock": "",
@@ -190,9 +191,8 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		"/lib/modules:/usr/lib/modules", // make host kernel modules accessible
 	}
 
-	if startContainersWithSystemD {
-		binds = append(binds, "/sys/fs/cgroup:/sys/fs/cgroup:rw")
-	}
+	// With CgroupnsModePrivate, Docker mounts the container's own cgroup
+	// subtree at /sys/fs/cgroup automatically. No host bind mount needed.
 
 	if lxcfsEnabled {
 		binds = append(binds, "/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw")
