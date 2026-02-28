@@ -40,12 +40,12 @@ jobs:
 
   # TODO delete integration-experiment
   - name: integration-experiment
-    serial: true
+#    serial: true
     plan:
     - in_parallel:
       - get: bosh-docker-cpi-release
         resource: bosh-docker-cpi-test
-        trigger: true
+#        trigger: true
       - get: ci
         resource: bosh-docker-cpi-test
       - get: bosh-deployment

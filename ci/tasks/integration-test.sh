@@ -378,7 +378,16 @@ EOF
       fi
       echo "=== Container ${cname} died - capturing logs ===" >> /tmp/dead-container-logs.txt
       docker inspect --format 'ExitCode={{.State.ExitCode}} StartedAt={{.State.StartedAt}} FinishedAt={{.State.FinishedAt}}' "${cname}" >> /tmp/dead-container-logs.txt 2>&1 || true
+      docker inspect --format 'CgroupnsMode={{.HostConfig.CgroupnsMode}} Privileged={{.HostConfig.Privileged}} Binds={{.HostConfig.Binds}}' "${cname}" >> /tmp/dead-container-logs.txt 2>&1 || true
       docker logs "${cname}" >> /tmp/dead-container-logs.txt 2>&1 || true
+      echo "--- systemd journal from ${cname} ---" >> /tmp/dead-container-logs.txt
+      docker cp "${cname}:/var/log/journal" "/tmp/journal-${cname}" 2>/dev/null && \
+        find "/tmp/journal-${cname}" -name "*.journal" -exec journalctl --file {} --no-pager 2>&1 \; >> /tmp/dead-container-logs.txt || \
+        echo "(no journal available)" >> /tmp/dead-container-logs.txt
+      echo "--- /sys/fs/cgroup contents from ${cname} ---" >> /tmp/dead-container-logs.txt
+      docker cp "${cname}:/sys/fs/cgroup/" "/tmp/cgroup-${cname}" 2>/dev/null && \
+        ls -la "/tmp/cgroup-${cname}/" >> /tmp/dead-container-logs.txt 2>&1 || \
+        echo "(could not copy cgroup)" >> /tmp/dead-container-logs.txt
       echo "=== End ${cname} ===" >> /tmp/dead-container-logs.txt
     done
   ) &

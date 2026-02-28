@@ -106,7 +106,6 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		populateResolveConf(networks),
 		`umount /etc/hosts`,
 		`umount /etc/hostname`,
-		`mount -o remount,rw /sys/fs/cgroup`,
 		networkInitBashCmd,
 		`rm -rf /var/vcap/data/sys`,
 		`mkdir -p /var/vcap/data/sys`,
@@ -140,7 +139,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			deleteUnwantedUnitsCommand,
 		}...)
 
-		startContainerCommands = append(preStartCommands, `exec /sbin/init`)
+		startContainerCommands = append(preStartCommands, `exec /sbin/init --log-level=debug --log-target=console`)
 	} else {
 		preStartCommands = append(preStartCommands, []string{}...)
 
@@ -166,11 +165,12 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	vmProps.HostConfig.PublishAllPorts = true //nolint:staticcheck
 
 	if startContainersWithSystemD {
-		// Use a private cgroup namespace so each container's systemd manages
-		// its own isolated cgroup subtree. With CgroupnsModeHost, multiple
-		// systemd instances compete for the same cgroup hierarchy, causing
-		// intermittent initialization failures.
-		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModePrivate //nolint:staticcheck
+		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModeHost //nolint:staticcheck
+		vmProps.HostConfig.Tmpfs = map[string]string{ //nolint:staticcheck
+			"/run":      "",
+			"/run/lock": "",
+			"/tmp":      "",
+		}
 	}
 
 	for _, port := range vmProps.ExposedPorts {
@@ -184,9 +184,9 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		"/lib/modules:/usr/lib/modules", // make host kernel modules accessible
 	}
 
-	// With CgroupnsModePrivate, Docker mounts the container's own cgroup
-	// subtree at /sys/fs/cgroup. The prestart commands remount it as rw
-	// so systemd can manage service cgroups.
+	if startContainersWithSystemD {
+		binds = append(binds, "/sys/fs/cgroup:/sys/fs/cgroup:rw")
+	}
 
 	if lxcfsEnabled {
 		binds = append(binds, "/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw")
