@@ -283,35 +283,32 @@ EOF
 
         if [ -n "${image}" ]; then
           echo ""
-          echo "--- Test 1: exact same command as the failed container ---"
-          local orig_cmd
-          orig_cmd=$(docker inspect --format '{{json .Config.Cmd}}' "${cid}" 2>/dev/null)
-          echo "Command: ${orig_cmd}"
-          docker run --rm -d --name diag-exact \
+          echo "--- Test 1: full prestart (umounts + find + /sbin/init) ---"
+          docker run --rm -d --name diag-full \
             --privileged --cgroupns=host \
             -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
             -v /lib/modules:/usr/lib/modules \
-            --network "${network_mode}" \
-            --ip 10.245.0.99 \
             "${image}" \
-            bash -c 'set -x; umount /etc/resolv.conf; echo "umount resolv rc=$?"; umount /etc/hosts; echo "umount hosts rc=$?"; umount /etc/hostname; echo "umount hostname rc=$?"; echo "prestart-done"; exec /sbin/init' 2>&1 || true
+            bash -exc 'umount /etc/resolv.conf && printf "%s\n" "nameserver 8.8.8.8" > /etc/resolv.conf && umount /etc/hosts && umount /etc/hostname && rm -rf /var/vcap/data/sys && mkdir -p /var/vcap/data/sys && mkdir -p /var/vcap/store && rm -rf /etc/sv/{ssh,cron} && rm -rf /etc/service/{ssh,cron} && find /etc/systemd/system /lib/systemd/system -path "*.wants/*" -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" -not -name "*systemd-tmpfiles*" -exec rm {} \; && exec /sbin/init' 2>&1 || true
           sleep 5
-          echo "--- diag-exact status ---"
-          docker ps -a --filter name=diag-exact --format "table {{.ID}}\t{{.Names}}\t{{.Status}}" 2>&1 || true
-          echo "--- diag-exact logs ---"
-          docker logs diag-exact 2>&1 || true
-          diag_status=$(docker inspect --format '{{.State.Status}}' diag-exact 2>/dev/null || echo "unknown")
+          echo "--- diag-full status ---"
+          docker ps -a --filter name=diag-full --format "table {{.ID}}\t{{.Names}}\t{{.Status}}" 2>&1 || true
+          echo "--- diag-full logs ---"
+          docker logs diag-full 2>&1 || true
+          diag_status=$(docker inspect --format '{{.State.Status}}' diag-full 2>/dev/null || echo "unknown")
           if [ "${diag_status}" = "running" ]; then
-            echo "--- diag-exact: systemd running OK ---"
-            docker exec diag-exact ps aux 2>&1 | head -10 || true
+            echo "--- diag-full: systemd running OK ---"
+            docker exec diag-full ps aux 2>&1 | head -10 || true
           else
-            echo "--- diag-exact: container NOT running (status=${diag_status}) ---"
-            docker inspect --format 'ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}}' diag-exact 2>&1 || true
+            echo "--- diag-full: container NOT running (status=${diag_status}) ---"
+            docker inspect --format 'ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}} StartedAt={{.State.StartedAt}} FinishedAt={{.State.FinishedAt}}' diag-full 2>&1 || true
+            echo "--- diag-full logs (full) ---"
+            docker logs diag-full 2>&1 || true
           fi
-          docker rm -f diag-exact 2>/dev/null || true
+          docker rm -f diag-full 2>/dev/null || true
 
           echo ""
-          echo "--- Test 2: minimal /sbin/init (no umounts, no network) ---"
+          echo "--- Test 2: minimal /sbin/init (no prestart commands) ---"
           docker run --rm -d --name diag-minimal \
             --privileged --cgroupns=host \
             -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
