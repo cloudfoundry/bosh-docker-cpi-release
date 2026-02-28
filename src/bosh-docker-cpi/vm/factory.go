@@ -139,7 +139,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			deleteUnwantedUnitsCommand,
 		}...)
 
-		startContainerCommands = append(preStartCommands, `sleep 5`, `exec /sbin/init`)
+		startContainerCommands = append(preStartCommands, `exec /sbin/init`)
 	} else {
 		preStartCommands = append(preStartCommands, []string{}...)
 

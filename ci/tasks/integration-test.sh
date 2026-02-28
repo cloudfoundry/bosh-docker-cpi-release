@@ -326,7 +326,7 @@ EOF
           local diag3_pass=0
           local diag3_fail=0
           for attempt in $(seq 1 10); do
-            docker run --rm -d --name "diag-cpi-${attempt}" \
+            docker run -d --name "diag-cpi-${attempt}" \
               --privileged --cgroupns=host \
               -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
               -v /lib/modules:/usr/lib/modules \
@@ -339,8 +339,13 @@ EOF
             else
               diag3_fail=$((diag3_fail + 1))
               echo "--- diag-cpi attempt ${attempt}: FAILED (status=${diag_status}) ---"
-              docker inspect --format 'ExitCode={{.State.ExitCode}}' "diag-cpi-${attempt}" 2>&1 || true
+              docker inspect --format 'ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}}' "diag-cpi-${attempt}" 2>&1 || true
+              echo "--- diag-cpi-${attempt} logs ---"
               docker logs "diag-cpi-${attempt}" 2>&1 || true
+              echo "--- diag-cpi-${attempt} /proc/1/cgroup ---"
+              docker exec "diag-cpi-${attempt}" cat /proc/1/cgroup 2>&1 || echo "(container not running)" || true
+              echo "--- diag-cpi-${attempt} mount | grep cgroup ---"
+              docker exec "diag-cpi-${attempt}" mount 2>&1 | grep cgroup || echo "(container not running)" || true
             fi
             docker rm -f "diag-cpi-${attempt}" 2>/dev/null || true
           done
