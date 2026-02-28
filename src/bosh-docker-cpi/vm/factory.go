@@ -165,7 +165,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	vmProps.HostConfig.PublishAllPorts = true //nolint:staticcheck
 
 	if startContainersWithSystemD {
-		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModePrivate //nolint:staticcheck
+		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModeHost //nolint:staticcheck
 	}
 
 	for _, port := range vmProps.ExposedPorts {
@@ -179,8 +179,9 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		"/lib/modules:/usr/lib/modules", // make host kernel modules accessible
 	}
 
-	// With CgroupnsModePrivate, Docker mounts the container's own cgroup
-	// subtree at /sys/fs/cgroup automatically. No host bind mount needed.
+	if startContainersWithSystemD {
+		binds = append(binds, "/sys/fs/cgroup:/sys/fs/cgroup:rw")
+	}
 
 	if lxcfsEnabled {
 		binds = append(binds, "/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw")
