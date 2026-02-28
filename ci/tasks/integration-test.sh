@@ -320,6 +320,45 @@ EOF
           echo "--- diag-minimal logs ---"
           docker logs diag-minimal 2>&1 || true
           docker rm -f diag-minimal 2>/dev/null || true
+
+          echo ""
+          echo "--- Test 3: cgroupns=private with tmpfs (matching CPI config) ---"
+          for attempt in 1 2 3 4 5; do
+            docker run --rm -d --name "diag-private-${attempt}" \
+              --privileged --cgroupns=private \
+              --tmpfs /run --tmpfs /run/lock --tmpfs /tmp \
+              -v /lib/modules:/usr/lib/modules \
+              "${image}" \
+              bash -exc 'umount /etc/resolv.conf && printf "%s\n" "nameserver 8.8.8.8" > /etc/resolv.conf && umount /etc/hosts && umount /etc/hostname && rm -rf /var/vcap/data/sys && mkdir -p /var/vcap/data/sys && mkdir -p /var/vcap/store && rm -rf /etc/sv/{ssh,cron} && rm -rf /etc/service/{ssh,cron} && find /etc/systemd/system /lib/systemd/system -path "*.wants/*" -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" -not -name "*systemd-tmpfiles*" -exec rm {} \; && exec /sbin/init' 2>&1 || true
+            sleep 3
+            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-private-${attempt}" 2>/dev/null || echo "unknown")
+            echo "--- diag-private attempt ${attempt}: status=${diag_status} ---"
+            if [ "${diag_status}" != "running" ]; then
+              docker inspect --format 'ExitCode={{.State.ExitCode}}' "diag-private-${attempt}" 2>&1 || true
+              docker logs "diag-private-${attempt}" 2>&1 || true
+            fi
+            docker rm -f "diag-private-${attempt}" 2>/dev/null || true
+          done
+
+          echo ""
+          echo "--- Test 4: cgroupns=host with tmpfs (matching diag-full + tmpfs) ---"
+          for attempt in 1 2 3 4 5; do
+            docker run --rm -d --name "diag-host-tmpfs-${attempt}" \
+              --privileged --cgroupns=host \
+              --tmpfs /run --tmpfs /run/lock --tmpfs /tmp \
+              -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+              -v /lib/modules:/usr/lib/modules \
+              "${image}" \
+              bash -exc 'umount /etc/resolv.conf && printf "%s\n" "nameserver 8.8.8.8" > /etc/resolv.conf && umount /etc/hosts && umount /etc/hostname && rm -rf /var/vcap/data/sys && mkdir -p /var/vcap/data/sys && mkdir -p /var/vcap/store && rm -rf /etc/sv/{ssh,cron} && rm -rf /etc/service/{ssh,cron} && find /etc/systemd/system /lib/systemd/system -path "*.wants/*" -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" -not -name "*systemd-tmpfiles*" -exec rm {} \; && exec /sbin/init' 2>&1 || true
+            sleep 3
+            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-host-tmpfs-${attempt}" 2>/dev/null || echo "unknown")
+            echo "--- diag-host-tmpfs attempt ${attempt}: status=${diag_status} ---"
+            if [ "${diag_status}" != "running" ]; then
+              docker inspect --format 'ExitCode={{.State.ExitCode}}' "diag-host-tmpfs-${attempt}" 2>&1 || true
+              docker logs "diag-host-tmpfs-${attempt}" 2>&1 || true
+            fi
+            docker rm -f "diag-host-tmpfs-${attempt}" 2>/dev/null || true
+          done
         fi
       fi
     done
