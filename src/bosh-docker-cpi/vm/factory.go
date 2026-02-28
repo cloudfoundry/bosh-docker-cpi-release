@@ -139,6 +139,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		// and enable controllers so systemd can create sub-cgroups.
 		setupCgroupForSystemd := `CGRP=$(cat /proc/self/cgroup | head -1 | cut -d: -f3) && ` +
 			`echo "cgroup-setup: path=${CGRP}" >&2 && ` +
+			`echo "cgroup-setup: mount_opts=$(grep cgroup2 /proc/mounts 2>&1)" >&2 && ` +
 			`echo "cgroup-setup: controllers=$(cat /sys/fs/cgroup${CGRP}/cgroup.controllers 2>&1)" >&2 && ` +
 			`echo "cgroup-setup: subtree_control_before=$(cat /sys/fs/cgroup${CGRP}/cgroup.subtree_control 2>&1)" >&2 && ` +
 			`echo "cgroup-setup: procs=$(cat /sys/fs/cgroup${CGRP}/cgroup.procs 2>&1)" >&2 && ` +
@@ -148,6 +149,8 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			`sed -e "s/ / +/g" -e "s/^/+/" < /sys/fs/cgroup${CGRP}/cgroup.controllers > /sys/fs/cgroup${CGRP}/cgroup.subtree_control 2>/dev/null; ` +
 			`}; do true; done; ` +
 			`echo "cgroup-setup: subtree_control_after=$(cat /sys/fs/cgroup${CGRP}/cgroup.subtree_control 2>&1)" >&2 && ` +
+			`echo "cgroup-setup: init_procs=$(cat /sys/fs/cgroup${CGRP}/init/cgroup.procs 2>&1)" >&2 && ` +
+			`echo "cgroup-setup: root_procs_after=$(cat /sys/fs/cgroup${CGRP}/cgroup.procs 2>&1)" >&2 && ` +
 			`true`
 
 		preStartCommands = append(preStartCommands, []string{
