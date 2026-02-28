@@ -139,14 +139,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			deleteUnwantedUnitsCommand,
 		}...)
 
-		startContainerCommands = append(preStartCommands,
-			`echo "=== starting /sbin/init at $(date -u +%H:%M:%S.%N) ==="`,
-			`echo "=== /proc/1/cgroup: $(cat /proc/1/cgroup 2>&1) ==="`,
-			`echo "=== mount | grep cgroup: $(mount | grep cgroup 2>&1) ==="`,
-			`echo "=== ls /sys/fs/cgroup/: $(ls /sys/fs/cgroup/ 2>&1 | head -20) ==="`,
-			`echo "=== cgroup writable test: $(echo +pids > /sys/fs/cgroup/cgroup.subtree_control 2>&1 && echo OK || echo FAILED) ==="`,
-			`exec /sbin/init --log-level=debug --log-target=console`,
-		)
+		startContainerCommands = append(preStartCommands, `exec /sbin/init`)
 	} else {
 		preStartCommands = append(preStartCommands, []string{}...)
 
@@ -173,11 +166,6 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 
 	if startContainersWithSystemD {
 		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModePrivate //nolint:staticcheck
-		vmProps.HostConfig.Tmpfs = map[string]string{ //nolint:staticcheck
-			"/run":      "",
-			"/run/lock": "",
-			"/tmp":      "",
-		}
 	}
 
 	for _, port := range vmProps.ExposedPorts {
