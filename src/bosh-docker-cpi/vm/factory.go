@@ -106,6 +106,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		populateResolveConf(networks),
 		`umount /etc/hosts`,
 		`umount /etc/hostname`,
+		`mount -o remount,rw /sys/fs/cgroup`,
 		networkInitBashCmd,
 		`rm -rf /var/vcap/data/sys`,
 		`mkdir -p /var/vcap/data/sys`,
@@ -165,8 +166,11 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	vmProps.HostConfig.PublishAllPorts = true //nolint:staticcheck
 
 	if startContainersWithSystemD {
-		// systemd requires access to the host cgroup hierarchy, especially with cgroups v2.
-		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModeHost //nolint:staticcheck
+		// Use a private cgroup namespace so each container's systemd manages
+		// its own isolated cgroup subtree. With CgroupnsModeHost, multiple
+		// systemd instances compete for the same cgroup hierarchy, causing
+		// intermittent initialization failures.
+		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModePrivate //nolint:staticcheck
 	}
 
 	for _, port := range vmProps.ExposedPorts {
@@ -180,12 +184,9 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		"/lib/modules:/usr/lib/modules", // make host kernel modules accessible
 	}
 
-	if startContainersWithSystemD {
-		// systemd needs read-write access to the cgroup filesystem to manage
-		// service cgroups. Without this mount, systemd may fail to initialize
-		// on cgroups v2 hosts.
-		binds = append(binds, "/sys/fs/cgroup:/sys/fs/cgroup:rw")
-	}
+	// With CgroupnsModePrivate, Docker mounts the container's own cgroup
+	// subtree at /sys/fs/cgroup. The prestart commands remount it as rw
+	// so systemd can manage service cgroups.
 
 	if lxcfsEnabled {
 		binds = append(binds, "/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw")
