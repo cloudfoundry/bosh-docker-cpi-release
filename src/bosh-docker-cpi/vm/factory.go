@@ -139,7 +139,13 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			deleteUnwantedUnitsCommand,
 		}...)
 
-		startContainerCommands = append(preStartCommands, `exec /sbin/init --log-level=debug --log-target=console`)
+		startContainerCommands = append(preStartCommands,
+			`echo "=== starting /sbin/init at $(date -u +%H:%M:%S.%N) ==="`,
+			`echo "=== /proc/1/cgroup: $(cat /proc/1/cgroup 2>&1) ==="`,
+			`echo "=== mount | grep cgroup: $(mount | grep cgroup 2>&1) ==="`,
+			`echo "=== ls /sys/fs/cgroup/: $(ls /sys/fs/cgroup/ 2>&1 | head -20) ==="`,
+			`exec /sbin/init --log-level=debug --log-target=console`,
+		)
 	} else {
 		preStartCommands = append(preStartCommands, []string{}...)
 
