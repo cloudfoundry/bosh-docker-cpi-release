@@ -133,10 +133,24 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			`-exec rm \{} \;`,
 		}, " ")
 
+		// Prepare the container's cgroup for systemd. With cgroupns=host and
+		// cgroups v2, Docker places the container's processes in a cgroup but
+		// does not enable controllers in subtree_control. systemd needs
+		// controllers delegated to create its own cgroup hierarchy (system.slice,
+		// etc). This mirrors the sanitize_cgroups pattern used for Docker-in-Docker:
+		// move all processes to a child cgroup, then enable all controllers.
+		setupCgroupForSystemd := `MY_CGROUP=$(cat /proc/self/cgroup | grep "^0::" | cut -d: -f3) && ` +
+			`if [ -n "${MY_CGROUP}" ] && [ -d "/sys/fs/cgroup${MY_CGROUP}" ]; then ` +
+			`mkdir -p "/sys/fs/cgroup${MY_CGROUP}/init" && ` +
+			`xargs -rn1 < "/sys/fs/cgroup${MY_CGROUP}/cgroup.procs" > "/sys/fs/cgroup${MY_CGROUP}/init/cgroup.procs" 2>/dev/null; ` +
+			`sed -e "s/ / +/g" -e "s/^/+/" < "/sys/fs/cgroup${MY_CGROUP}/cgroup.controllers" > "/sys/fs/cgroup${MY_CGROUP}/cgroup.subtree_control" 2>/dev/null; ` +
+			`true; fi`
+
 		preStartCommands = append(preStartCommands, []string{
 			`rm -rf /etc/sv/{ssh,cron}`,
 			`rm -rf /etc/service/{ssh,cron}`,
 			deleteUnwantedUnitsCommand,
+			setupCgroupForSystemd,
 		}...)
 
 		startContainerCommands = append(preStartCommands, `exec /sbin/init`)

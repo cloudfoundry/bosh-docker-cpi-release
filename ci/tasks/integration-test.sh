@@ -283,9 +283,11 @@ EOF
 
         if [ -n "${image}" ]; then
           echo ""
-          echo "--- Test: wrapper to capture systemd exit status ---"
-          for attempt in $(seq 1 5); do
-            docker run -d --name "diag-wrap-${attempt}" \
+          echo "--- Test A: cgroupns=host WITHOUT cgroup setup x10 (old behavior) ---"
+          local testA_pass=0
+          local testA_fail=0
+          for attempt in $(seq 1 10); do
+            docker run -d --name "diag-nosetup-${attempt}" \
               --privileged --cgroupns=host \
               -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
               -v /lib/modules:/usr/lib/modules \
@@ -301,117 +303,58 @@ EOF
                   -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" \
                   -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" \
                   -not -name "*systemd-tmpfiles*" -exec rm {} \;
-                echo "=== /proc/self/cgroup ==="
-                cat /proc/self/cgroup
-                MY_CGROUP=$(cat /proc/self/cgroup | cut -d: -f3)
-                echo "my cgroup path: ${MY_CGROUP}"
-                echo "=== cgroup contents ==="
-                ls /sys/fs/cgroup${MY_CGROUP}/ 2>&1 | head -10
-                echo "=== cgroup.subtree_control ==="
-                cat /sys/fs/cgroup${MY_CGROUP}/cgroup.subtree_control 2>/dev/null || echo "(empty or not readable)"
-                echo "=== starting /sbin/init via unshare --pid --fork ==="
-                unshare --pid --fork /sbin/init --log-level=debug --log-target=console --log-color=no &
-                INIT_PID=$!
-                echo "init wrapper pid: $INIT_PID"
-                wait $INIT_PID
-                EXIT_CODE=$?
-                SIGNAL=$((EXIT_CODE > 128 ? EXIT_CODE - 128 : 0))
-                echo "=== /sbin/init exited: code=${EXIT_CODE} signal=${SIGNAL} ==="
-                if [ $SIGNAL -gt 0 ]; then
-                  echo "Killed by signal ${SIGNAL} ($(kill -l ${SIGNAL} 2>/dev/null || echo unknown))"
+                exec /sbin/init
+              ' 2>&1 || true
+            sleep 3
+            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-nosetup-${attempt}" 2>/dev/null || echo "unknown")
+            if [ "${diag_status}" = "running" ]; then
+              testA_pass=$((testA_pass + 1))
+            else
+              testA_fail=$((testA_fail + 1))
+            fi
+            docker rm -f "diag-nosetup-${attempt}" 2>/dev/null || true
+          done
+          echo "--- Test A results (no cgroup setup): ${testA_pass}/10 passed, ${testA_fail}/10 failed ---"
+
+          echo ""
+          echo "--- Test B: cgroupns=host WITH cgroup setup x10 (new behavior) ---"
+          local testB_pass=0
+          local testB_fail=0
+          for attempt in $(seq 1 10); do
+            docker run -d --name "diag-setup-${attempt}" \
+              --privileged --cgroupns=host \
+              -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+              -v /lib/modules:/usr/lib/modules \
+              "${image}" \
+              bash -c '
+                umount /etc/resolv.conf 2>/dev/null
+                printf "%s\n" "nameserver 8.8.8.8" > /etc/resolv.conf
+                umount /etc/hosts 2>/dev/null
+                umount /etc/hostname 2>/dev/null
+                rm -rf /var/vcap/data/sys && mkdir -p /var/vcap/data/sys && mkdir -p /var/vcap/store
+                rm -rf /etc/sv/{ssh,cron} && rm -rf /etc/service/{ssh,cron}
+                find /etc/systemd/system /lib/systemd/system -path "*.wants/*" \
+                  -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" \
+                  -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" \
+                  -not -name "*systemd-tmpfiles*" -exec rm {} \;
+                MY_CGROUP=$(cat /proc/self/cgroup | grep "^0::" | cut -d: -f3)
+                if [ -n "${MY_CGROUP}" ] && [ -d "/sys/fs/cgroup${MY_CGROUP}" ]; then
+                  mkdir -p "/sys/fs/cgroup${MY_CGROUP}/init"
+                  xargs -rn1 < "/sys/fs/cgroup${MY_CGROUP}/cgroup.procs" > "/sys/fs/cgroup${MY_CGROUP}/init/cgroup.procs" 2>/dev/null || true
+                  sed -e "s/ / +/g" -e "s/^/+/" < "/sys/fs/cgroup${MY_CGROUP}/cgroup.controllers" > "/sys/fs/cgroup${MY_CGROUP}/cgroup.subtree_control" 2>/dev/null || true
                 fi
-                echo "=== checking journalctl ==="
-                journalctl --no-pager -n 30 2>&1 || echo "(no journal)"
-                sleep 999999
-              ' 2>&1 || true
-            sleep 10
-            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-wrap-${attempt}" 2>/dev/null || echo "unknown")
-            if [ "${diag_status}" = "running" ]; then
-              echo "--- diag-wrap-${attempt} logs ---"
-              docker logs "diag-wrap-${attempt}" 2>&1 || true
-              docker rm -f "diag-wrap-${attempt}" 2>/dev/null || true
-              break
-            fi
-            echo "--- diag-wrap-${attempt}: container exited (status=${diag_status}) ---"
-            docker inspect --format 'ExitCode={{.State.ExitCode}}' "diag-wrap-${attempt}" 2>&1 || true
-            docker logs "diag-wrap-${attempt}" 2>&1 || true
-            docker rm -f "diag-wrap-${attempt}" 2>/dev/null || true
-            break
-          done
-
-          echo ""
-          echo "--- Test: cgroupns=private x5 ---"
-          local priv_pass=0
-          local priv_fail=0
-          for attempt in $(seq 1 5); do
-            docker run -d --name "diag-priv-${attempt}" \
-              --privileged --cgroupns=private \
-              -v /lib/modules:/usr/lib/modules \
-              "${image}" \
-              bash -c '
-                umount /etc/resolv.conf 2>/dev/null
-                printf "%s\n" "nameserver 8.8.8.8" > /etc/resolv.conf
-                umount /etc/hosts 2>/dev/null
-                umount /etc/hostname 2>/dev/null
-                rm -rf /var/vcap/data/sys && mkdir -p /var/vcap/data/sys && mkdir -p /var/vcap/store
-                rm -rf /etc/sv/{ssh,cron} && rm -rf /etc/service/{ssh,cron}
-                find /etc/systemd/system /lib/systemd/system -path "*.wants/*" \
-                  -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" \
-                  -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" \
-                  -not -name "*systemd-tmpfiles*" -exec rm {} \;
-                mount -o remount,rw /sys/fs/cgroup 2>/dev/null || true
                 exec /sbin/init
               ' 2>&1 || true
             sleep 3
-            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-priv-${attempt}" 2>/dev/null || echo "unknown")
+            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-setup-${attempt}" 2>/dev/null || echo "unknown")
             if [ "${diag_status}" = "running" ]; then
-              priv_pass=$((priv_pass + 1))
+              testB_pass=$((testB_pass + 1))
             else
-              priv_fail=$((priv_fail + 1))
-              echo "--- diag-priv-${attempt}: FAILED ---"
-              docker inspect --format 'ExitCode={{.State.ExitCode}}' "diag-priv-${attempt}" 2>&1 || true
-              docker logs --tail 20 "diag-priv-${attempt}" 2>&1 || true
+              testB_fail=$((testB_fail + 1))
             fi
-            docker rm -f "diag-priv-${attempt}" 2>/dev/null || true
+            docker rm -f "diag-setup-${attempt}" 2>/dev/null || true
           done
-          echo "--- cgroupns=private results: ${priv_pass}/5 passed, ${priv_fail}/5 failed ---"
-
-          echo ""
-          echo "--- Test: cgroupns=host x5 (control) ---"
-          local host_pass=0
-          local host_fail=0
-          for attempt in $(seq 1 5); do
-            docker run -d --name "diag-host-${attempt}" \
-              --privileged --cgroupns=host \
-              -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
-              -v /lib/modules:/usr/lib/modules \
-              "${image}" \
-              bash -c '
-                umount /etc/resolv.conf 2>/dev/null
-                printf "%s\n" "nameserver 8.8.8.8" > /etc/resolv.conf
-                umount /etc/hosts 2>/dev/null
-                umount /etc/hostname 2>/dev/null
-                rm -rf /var/vcap/data/sys && mkdir -p /var/vcap/data/sys && mkdir -p /var/vcap/store
-                rm -rf /etc/sv/{ssh,cron} && rm -rf /etc/service/{ssh,cron}
-                find /etc/systemd/system /lib/systemd/system -path "*.wants/*" \
-                  -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" \
-                  -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" \
-                  -not -name "*systemd-tmpfiles*" -exec rm {} \;
-                exec /sbin/init
-              ' 2>&1 || true
-            sleep 3
-            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-host-${attempt}" 2>/dev/null || echo "unknown")
-            if [ "${diag_status}" = "running" ]; then
-              host_pass=$((host_pass + 1))
-            else
-              host_fail=$((host_fail + 1))
-              echo "--- diag-host-${attempt}: FAILED ---"
-              docker inspect --format 'ExitCode={{.State.ExitCode}}' "diag-host-${attempt}" 2>&1 || true
-              docker logs --tail 20 "diag-host-${attempt}" 2>&1 || true
-            fi
-            docker rm -f "diag-host-${attempt}" 2>/dev/null || true
-          done
-          echo "--- cgroupns=host results: ${host_pass}/5 passed, ${host_fail}/5 failed ---"
+          echo "--- Test B results (with cgroup setup): ${testB_pass}/10 passed, ${testB_fail}/10 failed ---"
         fi
       fi
     done
