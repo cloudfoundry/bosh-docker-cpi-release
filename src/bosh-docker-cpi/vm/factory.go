@@ -133,24 +133,23 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			`-exec rm \{} \;`,
 		}, " ")
 
-		// Set up cgroup delegation so systemd can manage its own hierarchy.
-		// With cgroupns=host the container sees the host cgroup tree. We
-		// need to create a child cgroup, move existing processes into it,
-		// and enable controllers so systemd can create sub-cgroups.
-		setupCgroupForSystemd := `CGRP=$(cat /proc/self/cgroup | head -1 | cut -d: -f3) && ` +
-			`echo "cgroup-setup: path=${CGRP}" >&2 && ` +
-			`echo "cgroup-setup: mount_opts=$(grep cgroup2 /proc/mounts 2>&1)" >&2 && ` +
-			`echo "cgroup-setup: controllers=$(cat /sys/fs/cgroup${CGRP}/cgroup.controllers 2>&1)" >&2 && ` +
-			`echo "cgroup-setup: subtree_control_before=$(cat /sys/fs/cgroup${CGRP}/cgroup.subtree_control 2>&1)" >&2 && ` +
-			`echo "cgroup-setup: procs=$(cat /sys/fs/cgroup${CGRP}/cgroup.procs 2>&1)" >&2 && ` +
-			`mkdir -p /sys/fs/cgroup${CGRP}/init && ` +
+		// With cgroupns=private, Docker mounts cgroupfs read-only. Remount
+		// as rw and set up cgroup delegation so systemd can create its
+		// hierarchy under the container's root cgroup.
+		setupCgroupForSystemd := `mount -o remount,rw /sys/fs/cgroup 2>/dev/null; ` +
+			`mkdir -p /sys/fs/cgroup/init && ` +
 			`while ! { ` +
-			`xargs -rn1 < /sys/fs/cgroup${CGRP}/cgroup.procs > /sys/fs/cgroup${CGRP}/init/cgroup.procs 2>/dev/null || true; ` +
-			`sed -e "s/ / +/g" -e "s/^/+/" < /sys/fs/cgroup${CGRP}/cgroup.controllers > /sys/fs/cgroup${CGRP}/cgroup.subtree_control 2>/dev/null; ` +
+			`xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs 2>/dev/null || true; ` +
+			`sed -e "s/ / +/g" -e "s/^/+/" < /sys/fs/cgroup/cgroup.controllers > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null; ` +
 			`}; do true; done; ` +
-			`echo "cgroup-setup: subtree_control_after=$(cat /sys/fs/cgroup${CGRP}/cgroup.subtree_control 2>&1)" >&2 && ` +
-			`echo "cgroup-setup: init_procs=$(cat /sys/fs/cgroup${CGRP}/init/cgroup.procs 2>&1)" >&2 && ` +
-			`echo "cgroup-setup: root_procs_after=$(cat /sys/fs/cgroup${CGRP}/cgroup.procs 2>&1)" >&2 && ` +
+			`true`
+
+		// nftables cgroup matching doesn't work with cgroupns=private
+		// because the kernel can't resolve cgroup paths across namespaces.
+		// Remove the nftables rules that reference cgroup paths to prevent
+		// monit from failing in a restart loop.
+		disableNftablesCgroupRules := `rm -f /etc/nftables/monit.nft; ` +
+			`test -f /etc/nftables.conf && sed -i '/monit/d' /etc/nftables.conf; ` +
 			`true`
 
 		preStartCommands = append(preStartCommands, []string{
@@ -158,6 +157,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			`rm -rf /etc/service/{ssh,cron}`,
 			deleteUnwantedUnitsCommand,
 			setupCgroupForSystemd,
+			disableNftablesCgroupRules,
 		}...)
 
 		startContainerCommands = append(preStartCommands, `exec /sbin/init`)
@@ -186,7 +186,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	vmProps.HostConfig.PublishAllPorts = true //nolint:staticcheck
 
 	if startContainersWithSystemD {
-		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModeHost //nolint:staticcheck
+		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModePrivate //nolint:staticcheck
 	}
 
 	for _, port := range vmProps.ExposedPorts {
@@ -198,10 +198,6 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	binds := []string{
 		fmt.Sprintf("%s:/var/vcap/data/", EphemeralDiskCID{id}.AsString()),
 		"/lib/modules:/usr/lib/modules", // make host kernel modules accessible
-	}
-
-	if startContainersWithSystemD {
-		binds = append(binds, "/sys/fs/cgroup:/sys/fs/cgroup:rw")
 	}
 
 	if lxcfsEnabled {
