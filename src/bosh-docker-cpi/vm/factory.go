@@ -187,6 +187,11 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 
 	if startContainersWithSystemD {
 		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModePrivate //nolint:staticcheck
+		vmProps.HostConfig.Tmpfs = map[string]string{ //nolint:staticcheck
+			"/run":      "",
+			"/run/lock": "",
+			"/tmp":      "",
+		}
 	}
 
 	for _, port := range vmProps.ExposedPorts {
