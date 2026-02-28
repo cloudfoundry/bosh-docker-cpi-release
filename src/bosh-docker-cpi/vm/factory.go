@@ -133,14 +133,15 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			`-exec rm \{} \;`,
 		}, " ")
 
-		// With cgroupns=private, Docker mounts cgroupfs read-only. systemd
-		// needs write access to manage cgroups. Remount as rw, then set up
-		// cgroup delegation so systemd can create its hierarchy.
-		setupCgroupForSystemd := `mount -o remount,rw /sys/fs/cgroup 2>/dev/null; ` +
-			`mkdir -p /sys/fs/cgroup/init && ` +
+		// Set up cgroup delegation so systemd can manage its own hierarchy.
+		// With cgroupns=host the container sees the host cgroup tree. We
+		// need to create a child cgroup, move existing processes into it,
+		// and enable controllers so systemd can create sub-cgroups.
+		setupCgroupForSystemd := `CGRP=$(cat /proc/self/cgroup | head -1 | cut -d: -f3) && ` +
+			`mkdir -p /sys/fs/cgroup${CGRP}/init && ` +
 			`while ! { ` +
-			`xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs 2>/dev/null || true; ` +
-			`sed -e "s/ / +/g" -e "s/^/+/" < /sys/fs/cgroup/cgroup.controllers > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null; ` +
+			`xargs -rn1 < /sys/fs/cgroup${CGRP}/cgroup.procs > /sys/fs/cgroup${CGRP}/init/cgroup.procs 2>/dev/null || true; ` +
+			`sed -e "s/ / +/g" -e "s/^/+/" < /sys/fs/cgroup${CGRP}/cgroup.controllers > /sys/fs/cgroup${CGRP}/cgroup.subtree_control 2>/dev/null; ` +
 			`}; do true; done; ` +
 			`true`
 
@@ -177,7 +178,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	vmProps.HostConfig.PublishAllPorts = true //nolint:staticcheck
 
 	if startContainersWithSystemD {
-		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModePrivate //nolint:staticcheck
+		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModeHost //nolint:staticcheck
 	}
 
 	for _, port := range vmProps.ExposedPorts {
@@ -191,8 +192,9 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		"/lib/modules:/usr/lib/modules", // make host kernel modules accessible
 	}
 
-	// With cgroupns=private, Docker sets up the cgroupfs automatically.
-	// No explicit /sys/fs/cgroup bind mount needed.
+	if startContainersWithSystemD {
+		binds = append(binds, "/sys/fs/cgroup:/sys/fs/cgroup:rw")
+	}
 
 	if lxcfsEnabled {
 		binds = append(binds, "/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw")
