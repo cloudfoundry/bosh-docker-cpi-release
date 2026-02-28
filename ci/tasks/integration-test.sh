@@ -283,73 +283,42 @@ EOF
 
         if [ -n "${image}" ]; then
           echo ""
-          echo "--- Test 1: full prestart (umounts + find + /sbin/init) ---"
-          docker run --rm -d --name diag-full \
-            --privileged --cgroupns=host \
-            -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
-            -v /lib/modules:/usr/lib/modules \
-            "${image}" \
-            bash -exc 'umount /etc/resolv.conf && printf "%s\n" "nameserver 8.8.8.8" > /etc/resolv.conf && umount /etc/hosts && umount /etc/hostname && rm -rf /var/vcap/data/sys && mkdir -p /var/vcap/data/sys && mkdir -p /var/vcap/store && rm -rf /etc/sv/{ssh,cron} && rm -rf /etc/service/{ssh,cron} && find /etc/systemd/system /lib/systemd/system -path "*.wants/*" -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" -not -name "*systemd-tmpfiles*" -exec rm {} \; && exec /sbin/init' 2>&1 || true
-          sleep 5
-          echo "--- diag-full status ---"
-          docker ps -a --filter name=diag-full --format "table {{.ID}}\t{{.Names}}\t{{.Status}}" 2>&1 || true
-          echo "--- diag-full logs ---"
-          docker logs diag-full 2>&1 || true
-          diag_status=$(docker inspect --format '{{.State.Status}}' diag-full 2>/dev/null || echo "unknown")
-          if [ "${diag_status}" = "running" ]; then
-            echo "--- diag-full: systemd running OK ---"
-            docker exec diag-full ps aux 2>&1 | head -10 || true
-          else
-            echo "--- diag-full: container NOT running (status=${diag_status}) ---"
-            docker inspect --format 'ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}} StartedAt={{.State.StartedAt}} FinishedAt={{.State.FinishedAt}}' diag-full 2>&1 || true
-            echo "--- diag-full logs (full) ---"
-            docker logs diag-full 2>&1 || true
-          fi
-          docker rm -f diag-full 2>/dev/null || true
-
-          echo ""
-          echo "--- Test 2: minimal /sbin/init (no prestart commands) ---"
-          docker run --rm -d --name diag-minimal \
-            --privileged --cgroupns=host \
-            -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
-            "${image}" \
-            bash -c 'echo minimal-prestart-ok && exec /sbin/init' 2>&1 || true
-          sleep 5
-          echo "--- diag-minimal status ---"
-          docker ps -a --filter name=diag-minimal --format "table {{.ID}}\t{{.Names}}\t{{.Status}}" 2>&1 || true
-          echo "--- diag-minimal logs ---"
-          docker logs diag-minimal 2>&1 || true
-          docker rm -f diag-minimal 2>/dev/null || true
-
-          echo ""
-          echo "--- Test 3: cgroupns=host, cgroup bind, no tmpfs (CPI config) x10 ---"
-          local diag3_pass=0
-          local diag3_fail=0
-          for attempt in $(seq 1 10); do
-            docker run -d --name "diag-cpi-${attempt}" \
+          echo "--- Test: reproduce and strace systemd crash ---"
+          for attempt in $(seq 1 5); do
+            docker run -d --name "diag-strace-${attempt}" \
               --privileged --cgroupns=host \
               -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
               -v /lib/modules:/usr/lib/modules \
               "${image}" \
-              bash -exc 'umount /etc/resolv.conf && printf "%s\n" "nameserver 8.8.8.8" > /etc/resolv.conf && umount /etc/hosts && umount /etc/hostname && rm -rf /var/vcap/data/sys && mkdir -p /var/vcap/data/sys && mkdir -p /var/vcap/store && rm -rf /etc/sv/{ssh,cron} && rm -rf /etc/service/{ssh,cron} && find /etc/systemd/system /lib/systemd/system -path "*.wants/*" -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" -not -name "*systemd-tmpfiles*" -exec rm {} \; && exec /sbin/init' 2>&1 || true
-            sleep 3
-            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-cpi-${attempt}" 2>/dev/null || echo "unknown")
+              bash -c '
+                umount /etc/resolv.conf 2>/dev/null
+                printf "%s\n" "nameserver 8.8.8.8" > /etc/resolv.conf
+                umount /etc/hosts 2>/dev/null
+                umount /etc/hostname 2>/dev/null
+                rm -rf /var/vcap/data/sys && mkdir -p /var/vcap/data/sys && mkdir -p /var/vcap/store
+                rm -rf /etc/sv/{ssh,cron} && rm -rf /etc/service/{ssh,cron}
+                find /etc/systemd/system /lib/systemd/system -path "*.wants/*" \
+                  -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" \
+                  -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" \
+                  -not -name "*systemd-tmpfiles*" -exec rm {} \;
+                apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq strace >/dev/null 2>&1
+                echo "=== strace exec /sbin/init ==="
+                exec strace -f -tt -o /dev/stderr /sbin/init
+              ' 2>&1 || true
+            sleep 8
+            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-strace-${attempt}" 2>/dev/null || echo "unknown")
             if [ "${diag_status}" = "running" ]; then
-              diag3_pass=$((diag3_pass + 1))
-            else
-              diag3_fail=$((diag3_fail + 1))
-              echo "--- diag-cpi attempt ${attempt}: FAILED (status=${diag_status}) ---"
-              docker inspect --format 'ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}}' "diag-cpi-${attempt}" 2>&1 || true
-              echo "--- diag-cpi-${attempt} logs ---"
-              docker logs "diag-cpi-${attempt}" 2>&1 || true
-              echo "--- diag-cpi-${attempt} /proc/1/cgroup ---"
-              docker exec "diag-cpi-${attempt}" cat /proc/1/cgroup 2>&1 || echo "(container not running)" || true
-              echo "--- diag-cpi-${attempt} mount | grep cgroup ---"
-              docker exec "diag-cpi-${attempt}" mount 2>&1 | grep cgroup || echo "(container not running)" || true
+              echo "--- diag-strace-${attempt}: systemd running OK ---"
+              docker rm -f "diag-strace-${attempt}" 2>/dev/null || true
+              continue
             fi
-            docker rm -f "diag-cpi-${attempt}" 2>/dev/null || true
+            echo "--- diag-strace-${attempt}: FAILED (status=${diag_status}) ---"
+            docker inspect --format 'ExitCode={{.State.ExitCode}}' "diag-strace-${attempt}" 2>&1 || true
+            echo "--- strace output (last 200 lines) ---"
+            docker logs --tail 200 "diag-strace-${attempt}" 2>&1 || true
+            docker rm -f "diag-strace-${attempt}" 2>/dev/null || true
+            break
           done
-          echo "--- Test 3 results: ${diag3_pass}/10 passed, ${diag3_fail}/10 failed ---"
         fi
       fi
     done
