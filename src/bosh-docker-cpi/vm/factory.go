@@ -133,18 +133,16 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			`-exec rm \{} \;`,
 		}, " ")
 
-		// Prepare the container's cgroup for systemd. With cgroupns=host and
-		// cgroups v2, Docker places the container's processes in a cgroup but
-		// does not enable controllers in subtree_control. systemd needs
-		// controllers delegated to create its own cgroup hierarchy (system.slice,
-		// etc). This mirrors the sanitize_cgroups pattern used for Docker-in-Docker:
-		// move all processes to a child cgroup, then enable all controllers.
-		setupCgroupForSystemd := `MY_CGROUP=$(cat /proc/self/cgroup | grep "^0::" | cut -d: -f3) && ` +
-			`if [ -n "${MY_CGROUP}" ] && [ -d "/sys/fs/cgroup${MY_CGROUP}" ]; then ` +
-			`mkdir -p "/sys/fs/cgroup${MY_CGROUP}/init" && ` +
-			`xargs -rn1 < "/sys/fs/cgroup${MY_CGROUP}/cgroup.procs" > "/sys/fs/cgroup${MY_CGROUP}/init/cgroup.procs" 2>/dev/null; ` +
-			`sed -e "s/ / +/g" -e "s/^/+/" < "/sys/fs/cgroup${MY_CGROUP}/cgroup.controllers" > "/sys/fs/cgroup${MY_CGROUP}/cgroup.subtree_control" 2>/dev/null; ` +
-			`true; fi`
+		// With cgroupns=private, Docker mounts cgroupfs read-only. systemd
+		// needs write access to manage cgroups. Remount as rw, then set up
+		// cgroup delegation so systemd can create its hierarchy.
+		setupCgroupForSystemd := `mount -o remount,rw /sys/fs/cgroup 2>/dev/null; ` +
+			`mkdir -p /sys/fs/cgroup/init && ` +
+			`while ! { ` +
+			`xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs 2>/dev/null || true; ` +
+			`sed -e "s/ / +/g" -e "s/^/+/" < /sys/fs/cgroup/cgroup.controllers > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null; ` +
+			`}; do true; done; ` +
+			`true`
 
 		preStartCommands = append(preStartCommands, []string{
 			`rm -rf /etc/sv/{ssh,cron}`,
@@ -179,7 +177,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	vmProps.HostConfig.PublishAllPorts = true //nolint:staticcheck
 
 	if startContainersWithSystemD {
-		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModeHost //nolint:staticcheck
+		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModePrivate //nolint:staticcheck
 	}
 
 	for _, port := range vmProps.ExposedPorts {
@@ -193,9 +191,8 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		"/lib/modules:/usr/lib/modules", // make host kernel modules accessible
 	}
 
-	if startContainersWithSystemD {
-		binds = append(binds, "/sys/fs/cgroup:/sys/fs/cgroup:rw")
-	}
+	// With cgroupns=private, Docker sets up the cgroupfs automatically.
+	// No explicit /sys/fs/cgroup bind mount needed.
 
 	if lxcfsEnabled {
 		binds = append(binds, "/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw")

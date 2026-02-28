@@ -283,13 +283,12 @@ EOF
 
         if [ -n "${image}" ]; then
           echo ""
-          echo "--- Test A: cgroupns=host WITHOUT cgroup setup x10 (old behavior) ---"
+          echo "--- Test A: cgroupns=private + remount + cgroup setup x10 ---"
           local testA_pass=0
           local testA_fail=0
           for attempt in $(seq 1 10); do
-            docker run -d --name "diag-nosetup-${attempt}" \
-              --privileged --cgroupns=host \
-              -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+            docker run -d --name "diag-priv-${attempt}" \
+              --privileged --cgroupns=private \
               -v /lib/modules:/usr/lib/modules \
               "${image}" \
               bash -c '
@@ -303,25 +302,34 @@ EOF
                   -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" \
                   -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" \
                   -not -name "*systemd-tmpfiles*" -exec rm {} \;
+                mount -o remount,rw /sys/fs/cgroup 2>/dev/null || true
+                mkdir -p /sys/fs/cgroup/init
+                while ! {
+                  xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs 2>/dev/null || true
+                  sed -e "s/ / +/g" -e "s/^/+/" < /sys/fs/cgroup/cgroup.controllers > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null
+                }; do true; done
                 exec /sbin/init
               ' 2>&1 || true
             sleep 3
-            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-nosetup-${attempt}" 2>/dev/null || echo "unknown")
+            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-priv-${attempt}" 2>/dev/null || echo "unknown")
             if [ "${diag_status}" = "running" ]; then
               testA_pass=$((testA_pass + 1))
             else
               testA_fail=$((testA_fail + 1))
+              echo "--- diag-priv-${attempt}: FAILED ---"
+              docker inspect --format 'ExitCode={{.State.ExitCode}}' "diag-priv-${attempt}" 2>&1 || true
+              docker logs --tail 10 "diag-priv-${attempt}" 2>&1 || true
             fi
-            docker rm -f "diag-nosetup-${attempt}" 2>/dev/null || true
+            docker rm -f "diag-priv-${attempt}" 2>/dev/null || true
           done
-          echo "--- Test A results (no cgroup setup): ${testA_pass}/10 passed, ${testA_fail}/10 failed ---"
+          echo "--- Test A results (private + remount + setup): ${testA_pass}/10 passed, ${testA_fail}/10 failed ---"
 
           echo ""
-          echo "--- Test B: cgroupns=host WITH cgroup setup x10 (new behavior) ---"
+          echo "--- Test B: cgroupns=host + cgroup setup x10 (previous approach) ---"
           local testB_pass=0
           local testB_fail=0
           for attempt in $(seq 1 10); do
-            docker run -d --name "diag-setup-${attempt}" \
+            docker run -d --name "diag-host-${attempt}" \
               --privileged --cgroupns=host \
               -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
               -v /lib/modules:/usr/lib/modules \
@@ -340,21 +348,26 @@ EOF
                 MY_CGROUP=$(cat /proc/self/cgroup | grep "^0::" | cut -d: -f3)
                 if [ -n "${MY_CGROUP}" ] && [ -d "/sys/fs/cgroup${MY_CGROUP}" ]; then
                   mkdir -p "/sys/fs/cgroup${MY_CGROUP}/init"
-                  xargs -rn1 < "/sys/fs/cgroup${MY_CGROUP}/cgroup.procs" > "/sys/fs/cgroup${MY_CGROUP}/init/cgroup.procs" 2>/dev/null || true
-                  sed -e "s/ / +/g" -e "s/^/+/" < "/sys/fs/cgroup${MY_CGROUP}/cgroup.controllers" > "/sys/fs/cgroup${MY_CGROUP}/cgroup.subtree_control" 2>/dev/null || true
+                  while ! {
+                    xargs -rn1 < "/sys/fs/cgroup${MY_CGROUP}/cgroup.procs" > "/sys/fs/cgroup${MY_CGROUP}/init/cgroup.procs" 2>/dev/null || true
+                    sed -e "s/ / +/g" -e "s/^/+/" < "/sys/fs/cgroup${MY_CGROUP}/cgroup.controllers" > "/sys/fs/cgroup${MY_CGROUP}/cgroup.subtree_control" 2>/dev/null
+                  }; do true; done
                 fi
                 exec /sbin/init
               ' 2>&1 || true
             sleep 3
-            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-setup-${attempt}" 2>/dev/null || echo "unknown")
+            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-host-${attempt}" 2>/dev/null || echo "unknown")
             if [ "${diag_status}" = "running" ]; then
               testB_pass=$((testB_pass + 1))
             else
               testB_fail=$((testB_fail + 1))
+              echo "--- diag-host-${attempt}: FAILED ---"
+              docker inspect --format 'ExitCode={{.State.ExitCode}}' "diag-host-${attempt}" 2>&1 || true
+              docker logs --tail 10 "diag-host-${attempt}" 2>&1 || true
             fi
-            docker rm -f "diag-setup-${attempt}" 2>/dev/null || true
+            docker rm -f "diag-host-${attempt}" 2>/dev/null || true
           done
-          echo "--- Test B results (with cgroup setup): ${testB_pass}/10 passed, ${testB_fail}/10 failed ---"
+          echo "--- Test B results (host + setup): ${testB_pass}/10 passed, ${testB_fail}/10 failed ---"
         fi
       fi
     done
