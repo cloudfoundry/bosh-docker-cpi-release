@@ -272,6 +272,19 @@ EOF
       echo "--- Container logs ---"
       docker logs "${cid}" 2>&1 || true
 
+      if [ "${cstatus}" = "running" ]; then
+        echo "--- Processes ---"
+        docker exec "${cid}" ps aux 2>&1 | head -30 || true
+        echo "--- BOSH agent log ---"
+        docker exec "${cid}" bash -c 'tail -30 /var/vcap/bosh/log/current 2>/dev/null || echo "no agent log found"' 2>&1 || true
+        echo "--- systemctl status ---"
+        docker exec "${cid}" systemctl status 2>&1 | head -30 || true
+        echo "--- systemctl list-units --failed ---"
+        docker exec "${cid}" systemctl list-units --failed 2>&1 || true
+        echo "--- journalctl last 30 lines ---"
+        docker exec "${cid}" journalctl --no-pager -n 30 2>&1 || true
+      fi
+
       if [ "${cstatus}" != "running" ]; then
         local image
         image=$(docker inspect --format '{{.Config.Image}}' "${cid}" 2>/dev/null)
