@@ -283,9 +283,9 @@ EOF
 
         if [ -n "${image}" ]; then
           echo ""
-          echo "--- Test: capture systemd crash details ---"
+          echo "--- Test: wrapper to capture systemd exit status ---"
           for attempt in $(seq 1 5); do
-            docker run -d --name "diag-crash-${attempt}" \
+            docker run -d --name "diag-wrap-${attempt}" \
               --privileged --cgroupns=host \
               -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
               -v /lib/modules:/usr/lib/modules \
@@ -301,48 +301,41 @@ EOF
                   -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" \
                   -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" \
                   -not -name "*systemd-tmpfiles*" -exec rm {} \;
-                echo "=== /sbin/init target ==="
-                ls -la /sbin/init
-                readlink -f /sbin/init
-                echo "=== systemd version ==="
-                /sbin/init --version 2>&1 || true
                 echo "=== /proc/self/cgroup ==="
                 cat /proc/self/cgroup
-                echo "=== cgroup mount ==="
-                mount | grep cgroup
-                echo "=== cgroup root contents ==="
-                ls -la /sys/fs/cgroup/ 2>&1 | head -20
-                echo "=== cgroup.subtree_control ==="
-                cat /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null || echo "(not readable)"
-                echo "=== cgroup.procs (first 5) ==="
-                cat /sys/fs/cgroup/cgroup.procs 2>/dev/null | head -5 || echo "(not readable)"
-                echo "=== my cgroup dir ==="
                 MY_CGROUP=$(cat /proc/self/cgroup | cut -d: -f3)
                 echo "my cgroup path: ${MY_CGROUP}"
-                ls -la "/sys/fs/cgroup${MY_CGROUP}/" 2>&1 | head -15 || echo "(not found)"
-                cat "/sys/fs/cgroup${MY_CGROUP}/cgroup.procs" 2>&1 | head -5 || echo "(not readable)"
-                cat "/sys/fs/cgroup${MY_CGROUP}/cgroup.subtree_control" 2>&1 || echo "(not readable)"
-                echo "=== trying to write to my cgroup ==="
-                echo "+cpu +memory +io +pids" > "/sys/fs/cgroup${MY_CGROUP}/cgroup.subtree_control" 2>&1 || echo "FAILED to enable controllers"
-                mkdir -p "/sys/fs/cgroup${MY_CGROUP}/test_subgroup" 2>&1 && echo "mkdir OK" || echo "FAILED to mkdir"
-                rmdir "/sys/fs/cgroup${MY_CGROUP}/test_subgroup" 2>/dev/null
-                echo "=== exec /sbin/init ==="
-                exec /sbin/init --log-level=debug --log-target=console --log-color=no
+                echo "=== cgroup contents ==="
+                ls /sys/fs/cgroup${MY_CGROUP}/ 2>&1 | head -10
+                echo "=== cgroup.subtree_control ==="
+                cat /sys/fs/cgroup${MY_CGROUP}/cgroup.subtree_control 2>/dev/null || echo "(empty or not readable)"
+                echo "=== starting /sbin/init via unshare --pid --fork ==="
+                unshare --pid --fork /sbin/init --log-level=debug --log-target=console --log-color=no &
+                INIT_PID=$!
+                echo "init wrapper pid: $INIT_PID"
+                wait $INIT_PID
+                EXIT_CODE=$?
+                SIGNAL=$((EXIT_CODE > 128 ? EXIT_CODE - 128 : 0))
+                echo "=== /sbin/init exited: code=${EXIT_CODE} signal=${SIGNAL} ==="
+                if [ $SIGNAL -gt 0 ]; then
+                  echo "Killed by signal ${SIGNAL} ($(kill -l ${SIGNAL} 2>/dev/null || echo unknown))"
+                fi
+                echo "=== checking journalctl ==="
+                journalctl --no-pager -n 30 2>&1 || echo "(no journal)"
+                sleep 999999
               ' 2>&1 || true
-            sleep 5
-            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-crash-${attempt}" 2>/dev/null || echo "unknown")
+            sleep 10
+            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-wrap-${attempt}" 2>/dev/null || echo "unknown")
             if [ "${diag_status}" = "running" ]; then
-              echo "--- diag-crash-${attempt}: systemd running OK ---"
-              docker rm -f "diag-crash-${attempt}" 2>/dev/null || true
-              continue
+              echo "--- diag-wrap-${attempt} logs ---"
+              docker logs "diag-wrap-${attempt}" 2>&1 || true
+              docker rm -f "diag-wrap-${attempt}" 2>/dev/null || true
+              break
             fi
-            echo "--- diag-crash-${attempt}: FAILED (status=${diag_status}) ---"
-            docker inspect --format 'ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}}' "diag-crash-${attempt}" 2>&1 || true
-            echo "--- container logs ---"
-            docker logs "diag-crash-${attempt}" 2>&1 || true
-            echo "--- dmesg last 30 lines ---"
-            dmesg 2>&1 | tail -30 || true
-            docker rm -f "diag-crash-${attempt}" 2>/dev/null || true
+            echo "--- diag-wrap-${attempt}: container exited (status=${diag_status}) ---"
+            docker inspect --format 'ExitCode={{.State.ExitCode}}' "diag-wrap-${attempt}" 2>&1 || true
+            docker logs "diag-wrap-${attempt}" 2>&1 || true
+            docker rm -f "diag-wrap-${attempt}" 2>/dev/null || true
             break
           done
 
