@@ -128,8 +128,12 @@ func (s *fileService) dockerExecNoOutput(args ...string) error {
 
 func (s *fileService) tarReader(fileName string, contents []byte) (io.Reader, error) {
 	tarBytes := &bytes.Buffer{}
+	var err error
 
 	tarWriter := tar.NewWriter(tarBytes)
+	defer func() {
+		err = tarWriter.Close()
+	}()
 
 	fileHeader := &tar.Header{
 		Name: fileName,
@@ -137,7 +141,7 @@ func (s *fileService) tarReader(fileName string, contents []byte) (io.Reader, er
 		Mode: 0640,
 	}
 
-	err := tarWriter.WriteHeader(fileHeader)
+	err = tarWriter.WriteHeader(fileHeader)
 	if err != nil {
 		return nil, bosherr.WrapError(err, "Writing tar header")
 	}
@@ -147,10 +151,5 @@ func (s *fileService) tarReader(fileName string, contents []byte) (io.Reader, er
 		return nil, bosherr.WrapError(err, "Writing file to tar")
 	}
 
-	err = tarWriter.Close()
-	if err != nil {
-		return nil, bosherr.WrapError(err, "Closing tar writer")
-	}
-
-	return tarBytes, nil
+	return tarBytes, err
 }
