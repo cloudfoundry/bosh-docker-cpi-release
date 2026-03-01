@@ -183,6 +183,19 @@ EOF
 }
 
 function main() {
+  echo ""
+  echo "=== HOST ENVIRONMENT ==="
+  echo "--- Kernel version ---"
+  uname -r || true
+  echo "--- /proc/mounts cgroup entries ---"
+  grep cgroup /proc/mounts || true
+  echo "--- cgroup controllers ---"
+  cat /sys/fs/cgroup/cgroup.controllers 2>/dev/null || echo "(not available)"
+  echo "--- cgroup subtree_control ---"
+  cat /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null || echo "(not available)"
+  echo "=== END HOST ENVIRONMENT ==="
+  echo ""
+
   OUTER_CONTAINER_IP=$(
     ip addr \
     | grep 'inet ' \
@@ -215,6 +228,12 @@ EOF
 
   start_docker "${certs_dir}"
 
+  echo ""
+  echo "=== DOCKER DAEMON INFO ==="
+  docker info 2>&1 || true
+  echo "=== END DOCKER DAEMON INFO ==="
+  echo ""
+
   local docker_network_name="director_network"
   local docker_network_cidr="10.245.0.0/16"
   if docker network ls | grep -q "${docker_network_name}"; then
@@ -246,9 +265,190 @@ EOF
     -v docker_cpi_path="${REPO_PARENT}/bosh-cpi-dev-artifacts/release.tgz" \
     "${@}" > "${local_bosh_dir}/bosh-director.yml"
 
-  bosh create-env "${local_bosh_dir}/bosh-director.yml" \
+  if ! bosh create-env "${local_bosh_dir}/bosh-director.yml" \
       --vars-store="${local_bosh_dir}/creds.yml" \
-      --state="${local_bosh_dir}/state.json"
+      --state="${local_bosh_dir}/state.json"; then
+
+    echo ""
+    echo "=== CREATE-ENV FAILED - COLLECTING DIAGNOSTICS ==="
+    echo ""
+
+    echo "--- docker ps (all containers, including stopped) ---"
+    docker ps -a --format "table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}" || true
+
+    for cid in $(docker ps -a -q); do
+      cname=$(docker inspect --format '{{.Name}}' "${cid}" | sed 's|^/||')
+      cstatus=$(docker inspect --format '{{.State.Status}}' "${cid}")
+      echo ""
+      echo "=== Container: ${cname} (${cid}) - Status: ${cstatus} ==="
+
+      echo "--- Container state ---"
+      docker inspect --format 'ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}} StartedAt={{.State.StartedAt}} FinishedAt={{.State.FinishedAt}}' "${cid}" 2>&1 || true
+
+      echo "--- Container HostConfig ---"
+      docker inspect --format 'Privileged={{.HostConfig.Privileged}} CgroupnsMode={{.HostConfig.CgroupnsMode}}' "${cid}" 2>&1 || true
+
+      echo "--- Container logs ---"
+      docker logs "${cid}" 2>&1 || true
+
+      if [ "${cstatus}" = "running" ]; then
+        echo "--- Processes ---"
+        docker exec "${cid}" ps aux 2>&1 | head -30 || true
+        echo "--- BOSH agent log ---"
+        docker exec "${cid}" bash -c 'tail -30 /var/vcap/bosh/log/current 2>/dev/null || echo "no agent log found"' 2>&1 || true
+        echo "--- systemctl status ---"
+        docker exec "${cid}" systemctl status 2>&1 | head -30 || true
+        echo "--- systemctl list-units --failed ---"
+        docker exec "${cid}" systemctl list-units --failed 2>&1 || true
+        echo "--- journalctl last 30 lines ---"
+        docker exec "${cid}" journalctl --no-pager -n 30 2>&1 || true
+      fi
+
+      if [ "${cstatus}" != "running" ]; then
+        local image
+        image=$(docker inspect --format '{{.Config.Image}}' "${cid}" 2>/dev/null)
+        local binds
+        binds=$(docker inspect --format '{{json .HostConfig.Binds}}' "${cid}" 2>/dev/null)
+        local network_mode
+        network_mode=$(docker inspect --format '{{.HostConfig.NetworkMode}}' "${cid}" 2>/dev/null)
+        echo "--- Failed container config: Image=${image} Binds=${binds} NetworkMode=${network_mode} ---"
+
+        if [ -n "${image}" ]; then
+          echo ""
+          echo "--- Test A: cgroupns=private + remount + cgroup setup x10 ---"
+          local testA_pass=0
+          local testA_fail=0
+          for attempt in $(seq 1 10); do
+            docker run -d --name "diag-priv-${attempt}" \
+              --privileged --cgroupns=private \
+              -v /lib/modules:/usr/lib/modules \
+              "${image}" \
+              bash -c '
+                umount /etc/resolv.conf 2>/dev/null
+                printf "%s\n" "nameserver 8.8.8.8" > /etc/resolv.conf
+                umount /etc/hosts 2>/dev/null
+                umount /etc/hostname 2>/dev/null
+                rm -rf /var/vcap/data/sys && mkdir -p /var/vcap/data/sys && mkdir -p /var/vcap/store
+                rm -rf /etc/sv/{ssh,cron} && rm -rf /etc/service/{ssh,cron}
+                find /etc/systemd/system /lib/systemd/system -path "*.wants/*" \
+                  -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" \
+                  -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" \
+                  -not -name "*systemd-tmpfiles*" -exec rm {} \;
+                mount -o remount,rw /sys/fs/cgroup 2>/dev/null || true
+                mkdir -p /sys/fs/cgroup/init
+                while ! {
+                  xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs 2>/dev/null || true
+                  sed -e "s/ / +/g" -e "s/^/+/" < /sys/fs/cgroup/cgroup.controllers > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null
+                }; do true; done
+                exec /sbin/init
+              ' 2>&1 || true
+            sleep 3
+            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-priv-${attempt}" 2>/dev/null || echo "unknown")
+            if [ "${diag_status}" = "running" ]; then
+              testA_pass=$((testA_pass + 1))
+            else
+              testA_fail=$((testA_fail + 1))
+              echo "--- diag-priv-${attempt}: FAILED ---"
+              docker inspect --format 'ExitCode={{.State.ExitCode}}' "diag-priv-${attempt}" 2>&1 || true
+              docker logs --tail 10 "diag-priv-${attempt}" 2>&1 || true
+            fi
+            docker rm -f "diag-priv-${attempt}" 2>/dev/null || true
+          done
+          echo "--- Test A results (private + remount + setup): ${testA_pass}/10 passed, ${testA_fail}/10 failed ---"
+
+          echo ""
+          echo "--- Test B: cgroupns=host + cgroup setup x10 (previous approach) ---"
+          local testB_pass=0
+          local testB_fail=0
+          for attempt in $(seq 1 10); do
+            docker run -d --name "diag-host-${attempt}" \
+              --privileged --cgroupns=host \
+              -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+              -v /lib/modules:/usr/lib/modules \
+              "${image}" \
+              bash -c '
+                umount /etc/resolv.conf 2>/dev/null
+                printf "%s\n" "nameserver 8.8.8.8" > /etc/resolv.conf
+                umount /etc/hosts 2>/dev/null
+                umount /etc/hostname 2>/dev/null
+                rm -rf /var/vcap/data/sys && mkdir -p /var/vcap/data/sys && mkdir -p /var/vcap/store
+                rm -rf /etc/sv/{ssh,cron} && rm -rf /etc/service/{ssh,cron}
+                find /etc/systemd/system /lib/systemd/system -path "*.wants/*" \
+                  -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" \
+                  -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" \
+                  -not -name "*systemd-tmpfiles*" -exec rm {} \;
+                MY_CGROUP=$(cat /proc/self/cgroup | grep "^0::" | cut -d: -f3)
+                if [ -n "${MY_CGROUP}" ] && [ -d "/sys/fs/cgroup${MY_CGROUP}" ]; then
+                  mkdir -p "/sys/fs/cgroup${MY_CGROUP}/init"
+                  while ! {
+                    xargs -rn1 < "/sys/fs/cgroup${MY_CGROUP}/cgroup.procs" > "/sys/fs/cgroup${MY_CGROUP}/init/cgroup.procs" 2>/dev/null || true
+                    sed -e "s/ / +/g" -e "s/^/+/" < "/sys/fs/cgroup${MY_CGROUP}/cgroup.controllers" > "/sys/fs/cgroup${MY_CGROUP}/cgroup.subtree_control" 2>/dev/null
+                  }; do true; done
+                fi
+                exec /sbin/init
+              ' 2>&1 || true
+            sleep 3
+            diag_status=$(docker inspect --format '{{.State.Status}}' "diag-host-${attempt}" 2>/dev/null || echo "unknown")
+            if [ "${diag_status}" = "running" ]; then
+              testB_pass=$((testB_pass + 1))
+            else
+              testB_fail=$((testB_fail + 1))
+              echo "--- diag-host-${attempt}: FAILED ---"
+              docker inspect --format 'ExitCode={{.State.ExitCode}}' "diag-host-${attempt}" 2>&1 || true
+              docker logs --tail 10 "diag-host-${attempt}" 2>&1 || true
+            fi
+            docker rm -f "diag-host-${attempt}" 2>/dev/null || true
+          done
+          echo "--- Test B results (host + setup): ${testB_pass}/10 passed, ${testB_fail}/10 failed ---"
+
+          if [ "${testA_fail}" -gt 0 ] || [ "${testB_fail}" -gt 0 ]; then
+            echo ""
+            echo "--- Test C: strace systemd init to capture failing syscall ---"
+            docker run --rm --name "diag-strace" \
+              --privileged --cgroupns=private \
+              -v /lib/modules:/usr/lib/modules \
+              "${image}" \
+              bash -c '
+                apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq strace >/dev/null 2>&1
+                mount -o remount,rw /sys/fs/cgroup 2>/dev/null || true
+                mkdir -p /sys/fs/cgroup/init
+                while ! {
+                  xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs 2>/dev/null || true
+                  sed -e "s/ / +/g" -e "s/^/+/" < /sys/fs/cgroup/cgroup.controllers > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null
+                }; do true; done
+                strace -f -tt -e trace=openat,mount,write,mkdir,unshare,clone3,pivot_root \
+                  -o /tmp/systemd-trace.log \
+                  unshare --pid --fork /sbin/init &
+                INIT_PID=$!
+                sleep 8
+                echo "=== strace output (last 200 lines) ==="
+                tail -200 /tmp/systemd-trace.log 2>/dev/null || echo "(no trace output)"
+                echo "=== strace output (first 100 lines) ==="
+                head -100 /tmp/systemd-trace.log 2>/dev/null || echo "(no trace output)"
+                kill $INIT_PID 2>/dev/null
+                kill -9 $INIT_PID 2>/dev/null
+              ' 2>&1 || true
+            docker rm -f "diag-strace" 2>/dev/null || true
+            echo "--- End strace diagnostic ---"
+          fi
+        fi
+      fi
+    done
+
+    echo ""
+    echo "--- dmesg (last 50 lines) ---"
+    dmesg 2>&1 | tail -50 || true
+
+    echo ""
+    echo "--- /sys/fs/cgroup status ---"
+    ls -la /sys/fs/cgroup/ 2>&1 || true
+    cat /sys/fs/cgroup/cgroup.subtree_control 2>&1 || true
+    cat /sys/fs/cgroup/cgroup.controllers 2>&1 || true
+
+    echo ""
+    echo "=== END CREATE-ENV DIAGNOSTICS ==="
+    exit 1
+  fi
 
   bosh int "${local_bosh_dir}/creds.yml" --path /director_ssl/ca > "${local_bosh_dir}/ca.crt"
   bosh_client_secret="$(bosh int "${local_bosh_dir}/creds.yml" --path /admin_password)"
@@ -275,10 +475,130 @@ EOF
 
   deployment_name="integration-test"
 
-  bosh deploy --non-interactive \
+  docker events --format '{{.Time}} {{.Type}} {{.Action}} {{.Actor.Attributes.name}} {{.Actor.ID}}' > /tmp/docker-events.log 2>&1 &
+  local docker_events_pid=$!
+
+  # Capture logs from any container that dies during the deploy.
+  # The director will destroy the container after the 600s timeout, so we
+  # need to grab logs between the "die" and "destroy" events.
+  (
+    docker events --filter event=die --format '{{.Actor.Attributes.name}}' 2>/dev/null | while read -r cname; do
+      # Skip the director container
+      if docker ps -q --filter "name=${cname}" 2>/dev/null | grep -q .; then
+        continue
+      fi
+      echo "=== Container ${cname} died - capturing logs ===" >> /tmp/dead-container-logs.txt
+      docker inspect --format 'ExitCode={{.State.ExitCode}} StartedAt={{.State.StartedAt}} FinishedAt={{.State.FinishedAt}}' "${cname}" >> /tmp/dead-container-logs.txt 2>&1 || true
+      docker inspect --format 'CgroupnsMode={{.HostConfig.CgroupnsMode}} Privileged={{.HostConfig.Privileged}} Binds={{.HostConfig.Binds}}' "${cname}" >> /tmp/dead-container-logs.txt 2>&1 || true
+      docker logs "${cname}" >> /tmp/dead-container-logs.txt 2>&1 || true
+      echo "--- systemd journal from ${cname} ---" >> /tmp/dead-container-logs.txt
+      docker cp "${cname}:/var/log/journal" "/tmp/journal-${cname}" 2>/dev/null && \
+        find "/tmp/journal-${cname}" -name "*.journal" -exec journalctl --file {} --no-pager 2>&1 \; >> /tmp/dead-container-logs.txt || \
+        echo "(no journal available)" >> /tmp/dead-container-logs.txt
+      echo "--- /sys/fs/cgroup contents from ${cname} ---" >> /tmp/dead-container-logs.txt
+      docker cp "${cname}:/sys/fs/cgroup/" "/tmp/cgroup-${cname}" 2>/dev/null && \
+        ls -la "/tmp/cgroup-${cname}/" >> /tmp/dead-container-logs.txt 2>&1 || \
+        echo "(could not copy cgroup)" >> /tmp/dead-container-logs.txt
+      echo "=== End ${cname} ===" >> /tmp/dead-container-logs.txt
+    done
+  ) &
+  local dead_container_watcher_pid=$!
+
+  if ! bosh deploy --non-interactive \
     --deployment "${deployment_name}" \
     "${REPO_ROOT}/ci/tasks/integration-test-manifest.yml" \
-     --var deployment_name="${deployment_name}"
+     --var deployment_name="${deployment_name}"; then
+
+    kill "${docker_events_pid}" 2>/dev/null || true
+    kill "${dead_container_watcher_pid}" 2>/dev/null || true
+    wait "${docker_events_pid}" 2>/dev/null || true
+    wait "${dead_container_watcher_pid}" 2>/dev/null || true
+
+    echo ""
+    echo "=== DEPLOYMENT FAILED - COLLECTING DIAGNOSTICS ==="
+    echo ""
+
+    echo "--- Logs from containers that died during deploy ---"
+    cat /tmp/dead-container-logs.txt 2>&1 || echo "(no dead container logs captured)"
+
+    echo ""
+    echo "--- Docker events during deploy ---"
+    cat /tmp/docker-events.log 2>&1 || true
+
+    echo ""
+    echo "--- docker ps (all containers, including stopped) ---"
+    docker ps -a --format "table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}" || true
+
+    local director_cid=""
+    for cid in $(docker ps -a -q); do
+      cname=$(docker inspect --format '{{.Name}}' "${cid}" | sed 's|^/||')
+      cstatus=$(docker inspect --format '{{.State.Status}}' "${cid}")
+      echo ""
+      echo "=== Container: ${cname} (${cid}) - Status: ${cstatus} ==="
+
+      echo "--- Container state ---"
+      docker inspect --format 'ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}} StartedAt={{.State.StartedAt}} FinishedAt={{.State.FinishedAt}}' "${cid}" 2>&1 || true
+
+      echo "--- Container HostConfig ---"
+      docker inspect --format 'Privileged={{.HostConfig.Privileged}} CgroupnsMode={{.HostConfig.CgroupnsMode}}' "${cid}" 2>&1 || true
+
+      echo "--- Container logs (last 50 lines) ---"
+      docker logs --tail 50 "${cid}" 2>&1 || true
+
+      if [ "${cstatus}" = "running" ]; then
+        director_cid="${cid}"
+
+        echo "--- Processes ---"
+        docker exec "${cid}" ps aux 2>&1 | head -30 || true
+
+        echo "--- BOSH agent log (last 30 lines) ---"
+        docker exec "${cid}" bash -c 'tail -30 /var/vcap/bosh/log/current 2>/dev/null || echo "no agent log found"' 2>&1 || true
+      fi
+    done
+
+    if [ -n "${director_cid}" ]; then
+      echo ""
+      echo "--- Director: find all log files ---"
+      docker exec "${director_cid}" bash -c 'find /var/vcap/sys/log /var/vcap/data/sys/log -name "*.log" -o -name "*.debug" -o -name "current" 2>/dev/null | head -30' 2>&1 || true
+
+      echo ""
+      echo "--- Director: CPI log (docker_cpi) ---"
+      docker exec "${director_cid}" bash -c 'find /var/vcap -path "*/docker_cpi*" -name "*.log" 2>/dev/null | while read f; do echo "=== $f ==="; tail -50 "$f"; done || echo "no CPI logs"' 2>&1 || true
+
+      echo ""
+      echo "--- Director: latest task debug log (last 100 lines) ---"
+      docker exec "${director_cid}" bash -c 'find /var/vcap -name "*.debug" -newer /var/vcap/bosh 2>/dev/null | sort | tail -1 | xargs tail -100 2>/dev/null || echo "no debug log found"' 2>&1 || true
+
+      echo ""
+      echo "--- Director: CPI request/response for create_vm ---"
+      docker exec "${director_cid}" bash -c 'find /var/vcap -name "*.debug" -newer /var/vcap/bosh 2>/dev/null | sort | tail -1 | xargs grep -A5 "create_vm\|Sent CPI request\|Received CPI response\|External CPI" 2>/dev/null | tail -80 || echo "not found"' 2>&1 || true
+    fi
+
+    echo ""
+    echo "--- iptables rules (filter table) ---"
+    iptables -L -n -v 2>&1 | head -60 || true
+
+    echo ""
+    echo "--- iptables rules (nat table) ---"
+    iptables -t nat -L -n -v 2>&1 | head -40 || true
+
+    echo ""
+    echo "--- iptables rules with cgroup matches ---"
+    iptables-save 2>&1 | grep -i cgroup || echo "(no cgroup iptables rules)"
+
+    echo ""
+    echo "--- dmesg (last 50 lines) ---"
+    dmesg 2>&1 | tail -50 || true
+
+    echo ""
+    echo "=== END DIAGNOSTICS ==="
+    exit 1
+  fi
+
+  kill "${docker_events_pid}" 2>/dev/null || true
+  kill "${dead_container_watcher_pid}" 2>/dev/null || true
+  wait "${docker_events_pid}" 2>/dev/null || true
+  wait "${dead_container_watcher_pid}" 2>/dev/null || true
 }
 
 main "${@}"
