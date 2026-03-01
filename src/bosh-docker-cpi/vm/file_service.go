@@ -7,7 +7,6 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
@@ -83,41 +82,6 @@ func (s *fileService) Upload(destinationPath string, contents []byte) error {
 	return nil
 }
 
-func (s *fileService) dockerExecNoOutput(args ...string) error {
-	// 5 minutes is an arbitrary defensive upper bound on command completion
-	// In practice this method should be completing in <hundreds of milliseconds
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	execProcess, err := s.dkrClient.ContainerExecCreate(ctx, s.vmCID.AsString(), container.ExecOptions{Cmd: args})
-	if err != nil {
-		return bosherr.WrapErrorf(err, "Creating docker exec create response")
-	}
-
-	if err = s.dkrClient.ContainerExecStart(ctx, execProcess.ID, container.ExecStartOptions{}); err != nil {
-		return bosherr.WrapErrorf(err, "Starting to docker exec")
-	}
-
-	for {
-		inspectResp, err := s.dkrClient.ContainerExecInspect(ctx, execProcess.ID)
-		if err != nil {
-			return bosherr.WrapErrorf(err, "Inspecting docker exec response")
-		}
-
-		if inspectResp.Running {
-			// Small idle time to avoid busy loop
-			time.Sleep(50 * time.Millisecond)
-			continue
-		}
-
-		if inspectResp.ExitCode != 0 {
-			return bosherr.Errorf("%v failed [exit status %d]", args, inspectResp.ExitCode)
-		}
-
-		return nil
-	}
-}
-
 func (s *fileService) tarReaderWithPath(fullPath string, contents []byte) (io.Reader, error) {
 	cleanPath := filepath.Clean(fullPath)
 	if len(cleanPath) > 0 && cleanPath[0] == '/' {
@@ -149,35 +113,6 @@ func (s *fileService) tarReaderWithPath(fullPath string, contents []byte) (io.Re
 		Size: int64(len(contents)),
 		Mode: 0640,
 	})
-	if err != nil {
-		return nil, bosherr.WrapError(err, "Writing tar header")
-	}
-
-	_, err = tarWriter.Write(contents)
-	if err != nil {
-		return nil, bosherr.WrapError(err, "Writing file to tar")
-	}
-
-	err = tarWriter.Close()
-	if err != nil {
-		return nil, bosherr.WrapError(err, "Closing tar writer")
-	}
-
-	return tarBytes, nil
-}
-
-func (s *fileService) tarReader(fileName string, contents []byte) (io.Reader, error) {
-	tarBytes := &bytes.Buffer{}
-
-	tarWriter := tar.NewWriter(tarBytes)
-
-	fileHeader := &tar.Header{
-		Name: fileName,
-		Size: int64(len(contents)),
-		Mode: 0640,
-	}
-
-	err := tarWriter.WriteHeader(fileHeader)
 	if err != nil {
 		return nil, bosherr.WrapError(err, "Writing tar header")
 	}

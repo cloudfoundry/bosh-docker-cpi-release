@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"bosh-docker-cpi/config"
 	bstem "bosh-docker-cpi/stemcell"
@@ -18,6 +19,9 @@ import (
 	dkrclient "github.com/docker/docker/client"
 	dkrnat "github.com/docker/go-connections/nat"
 )
+
+const systemdStartRetries = 3
+const systemdStartSettleTime = 3 * time.Second
 
 type Factory struct {
 	dkrClient *dkrclient.Client
@@ -187,7 +191,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 
 	if startContainersWithSystemD {
 		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModePrivate //nolint:staticcheck
-		vmProps.HostConfig.Tmpfs = map[string]string{ //nolint:staticcheck
+		vmProps.HostConfig.Tmpfs = map[string]string{                 //nolint:staticcheck
 			"/run":      "",
 			"/run/lock": "",
 			"/tmp":      "",
@@ -200,58 +204,104 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 
 	vmProps = f.cleanMounts(vmProps)
 
-	binds := []string{
-		fmt.Sprintf("%s:/var/vcap/data/", EphemeralDiskCID{id}.AsString()),
+	extraBinds := []string{
 		"/lib/modules:/usr/lib/modules", // make host kernel modules accessible
 	}
 
 	if lxcfsEnabled {
-		binds = append(binds, "/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw")
+		extraBinds = append(extraBinds, "/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw")
 	}
-
-	vmProps.HostConfig.Binds = binds //nolint:staticcheck
-
-	f.logger.Debug(f.logTag, "Creating container %#v, host %#v", containerConfig, &vmProps.HostConfig)
 
 	netConfig, additionalEndPtConfigs := splitNetworkSettings(netConfig)
 
 	vmProps.Platform.OS = "linux"           //nolint:staticcheck
 	vmProps.Platform.Architecture = "amd64" //nolint:staticcheck
 
-	container, err := f.dkrClient.ContainerCreate(
-		context.TODO(), containerConfig, &vmProps.HostConfig, netConfig, &vmProps.Platform, id.AsString())
-	if err != nil {
-		return Container{}, bosherr.WrapError(err, "Creating container")
-	}
-
-	f.logger.Debug(f.logTag,
-		"Connecting container '%s' to networks with opts %#v", container.ID, netConfig)
-
-	for name, endPtConfig := range additionalEndPtConfigs {
-		err := f.dkrClient.NetworkConnect(context.TODO(), name, id.AsString(), endPtConfig)
-		if err != nil {
-			return Container{}, bosherr.WrapErrorf(err, "Connecting container to network '%s'", name)
-		}
-	}
-
-	// Upload agent env before starting the container to avoid concurrent
-	// docker exec/cp operations that race with systemd's cgroup setup.
 	agentEnv := apiv1.AgentEnvFactory{}.ForVM(agentID, id, networks, env, f.agentOptions)
 	agentEnv.AttachSystemDisk(apiv1.NewDiskHintFromString(""))
 
-	fileService := NewFileService(f.dkrClient, id, f.logger)
-	agentEnvService := NewFSAgentEnvService(fileService, f.logger)
+	var agentEnvService AgentEnvService
 
-	err = agentEnvService.Update(agentEnv)
-	if err != nil {
-		f.cleanUpContainer(container)
-		return Container{}, bosherr.WrapError(err, "Updating container's agent env")
+	maxAttempts := 1
+	if startContainersWithSystemD {
+		maxAttempts = systemdStartRetries
 	}
 
-	err = f.dkrClient.ContainerStart(context.TODO(), id.AsString(), dkrcont.StartOptions{})
-	if err != nil {
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		vmProps.HostConfig.Binds = append( //nolint:staticcheck
+			[]string{fmt.Sprintf("%s:/var/vcap/data/", EphemeralDiskCID{id}.AsString())},
+			extraBinds...,
+		)
+
+		f.logger.Debug(f.logTag, "Creating container %#v, host %#v (attempt %d/%d)",
+			containerConfig, &vmProps.HostConfig, attempt, maxAttempts)
+
+		container, err := f.dkrClient.ContainerCreate(
+			context.TODO(), containerConfig, &vmProps.HostConfig, netConfig, &vmProps.Platform, id.AsString())
+		if err != nil {
+			return Container{}, bosherr.WrapError(err, "Creating container")
+		}
+
+		f.logger.Debug(f.logTag,
+			"Connecting container '%s' to networks with opts %#v", container.ID, netConfig)
+
+		for name, endPtConfig := range additionalEndPtConfigs {
+			err := f.dkrClient.NetworkConnect(context.TODO(), name, id.AsString(), endPtConfig)
+			if err != nil {
+				f.cleanUpContainer(container)
+				return Container{}, bosherr.WrapErrorf(err, "Connecting container to network '%s'", name)
+			}
+		}
+
+		fileService := NewFileService(f.dkrClient, id, f.logger)
+		agentEnvService = NewFSAgentEnvService(fileService, f.logger)
+
+		err = agentEnvService.Update(agentEnv)
+		if err != nil {
+			f.cleanUpContainer(container)
+			return Container{}, bosherr.WrapError(err, "Updating container's agent env")
+		}
+
+		err = f.dkrClient.ContainerStart(context.TODO(), id.AsString(), dkrcont.StartOptions{})
+		if err != nil {
+			f.cleanUpContainer(container)
+			return Container{}, bosherr.WrapError(err, "Starting container")
+		}
+
+		if !startContainersWithSystemD {
+			break
+		}
+
+		exitedWith255, err := f.containerExitedWith255(id, systemdStartSettleTime)
+		if err != nil {
+			f.logger.Debug(f.logTag, "Error checking container status after start (attempt %d/%d): %s",
+				attempt, maxAttempts, err.Error())
+			break
+		}
+
+		if !exitedWith255 {
+			break
+		}
+
+		f.logger.Debug(f.logTag,
+			"Container '%s' exited with code 255 (systemd early-init crash), attempt %d/%d",
+			id.AsString(), attempt, maxAttempts)
+
 		f.cleanUpContainer(container)
-		return Container{}, bosherr.WrapError(err, "Starting container")
+
+		if attempt == maxAttempts {
+			return Container{}, bosherr.Errorf(
+				"Container exited with code 255 after %d attempts (systemd failed to initialize)", maxAttempts)
+		}
+
+		idStr, err = f.uuidGen.Generate()
+		if err != nil {
+			return nil, bosherr.WrapError(err, "Generating container ID for retry")
+		}
+		idStr = "c-" + idStr
+		id = apiv1.NewVMCID(idStr)
+		agentEnv = apiv1.AgentEnvFactory{}.ForVM(agentID, id, networks, env, f.agentOptions)
+		agentEnv.AttachSystemDisk(apiv1.NewDiskHintFromString(""))
 	}
 
 	return NewContainer(id, f.dkrClient, agentEnvService, f.logger), nil
@@ -261,6 +311,24 @@ func (f Factory) Find(id apiv1.VMCID) (VM, error) {
 	fileService := NewFileService(f.dkrClient, id, f.logger)
 	agentEnvService := NewFSAgentEnvService(fileService, f.logger)
 	return NewContainer(id, f.dkrClient, agentEnvService, f.logger), nil
+}
+
+// containerExitedWith255 waits for settleTime then checks whether the
+// container has already exited with code 255, which indicates systemd
+// crashed during very early cgroup initialization.
+func (f Factory) containerExitedWith255(id apiv1.VMCID, settleTime time.Duration) (bool, error) {
+	time.Sleep(settleTime)
+
+	inspect, err := f.dkrClient.ContainerInspect(context.TODO(), id.AsString())
+	if err != nil {
+		return false, bosherr.WrapError(err, "Inspecting container after start")
+	}
+
+	if inspect.State.Running {
+		return false, nil
+	}
+
+	return inspect.State.ExitCode == 255, nil
 }
 
 func (f Factory) cleanUpContainer(container dkrcont.CreateResponse) {

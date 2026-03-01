@@ -183,6 +183,19 @@ EOF
 }
 
 function main() {
+  echo ""
+  echo "=== HOST ENVIRONMENT ==="
+  echo "--- Kernel version ---"
+  uname -r || true
+  echo "--- /proc/mounts cgroup entries ---"
+  grep cgroup /proc/mounts || true
+  echo "--- cgroup controllers ---"
+  cat /sys/fs/cgroup/cgroup.controllers 2>/dev/null || echo "(not available)"
+  echo "--- cgroup subtree_control ---"
+  cat /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null || echo "(not available)"
+  echo "=== END HOST ENVIRONMENT ==="
+  echo ""
+
   OUTER_CONTAINER_IP=$(
     ip addr \
     | grep 'inet ' \
@@ -214,6 +227,12 @@ EOF
   source "${local_bosh_dir}/docker-env"
 
   start_docker "${certs_dir}"
+
+  echo ""
+  echo "=== DOCKER DAEMON INFO ==="
+  docker info 2>&1 || true
+  echo "=== END DOCKER DAEMON INFO ==="
+  echo ""
 
   local docker_network_name="director_network"
   local docker_network_cidr="10.245.0.0/16"
@@ -381,6 +400,37 @@ EOF
             docker rm -f "diag-host-${attempt}" 2>/dev/null || true
           done
           echo "--- Test B results (host + setup): ${testB_pass}/10 passed, ${testB_fail}/10 failed ---"
+
+          if [ "${testA_fail}" -gt 0 ] || [ "${testB_fail}" -gt 0 ]; then
+            echo ""
+            echo "--- Test C: strace systemd init to capture failing syscall ---"
+            docker run --rm --name "diag-strace" \
+              --privileged --cgroupns=private \
+              -v /lib/modules:/usr/lib/modules \
+              "${image}" \
+              bash -c '
+                apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq strace >/dev/null 2>&1
+                mount -o remount,rw /sys/fs/cgroup 2>/dev/null || true
+                mkdir -p /sys/fs/cgroup/init
+                while ! {
+                  xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs 2>/dev/null || true
+                  sed -e "s/ / +/g" -e "s/^/+/" < /sys/fs/cgroup/cgroup.controllers > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null
+                }; do true; done
+                strace -f -tt -e trace=openat,mount,write,mkdir,unshare,clone3,pivot_root \
+                  -o /tmp/systemd-trace.log \
+                  unshare --pid --fork /sbin/init &
+                INIT_PID=$!
+                sleep 8
+                echo "=== strace output (last 200 lines) ==="
+                tail -200 /tmp/systemd-trace.log 2>/dev/null || echo "(no trace output)"
+                echo "=== strace output (first 100 lines) ==="
+                head -100 /tmp/systemd-trace.log 2>/dev/null || echo "(no trace output)"
+                kill $INIT_PID 2>/dev/null
+                kill -9 $INIT_PID 2>/dev/null
+              ' 2>&1 || true
+            docker rm -f "diag-strace" 2>/dev/null || true
+            echo "--- End strace diagnostic ---"
+          fi
         fi
       fi
     done
