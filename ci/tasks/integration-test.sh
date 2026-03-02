@@ -246,9 +246,67 @@ EOF
     -v docker_cpi_path="${REPO_PARENT}/bosh-cpi-dev-artifacts/release.tgz" \
     "${@}" > "${local_bosh_dir}/bosh-director.yml"
 
+  # #region agent log — monitor containers during create-env for systemd exit diagnostics
+  (
+    while true; do
+      for cid in $(docker ps -a -q 2>/dev/null); do
+        cstatus=$(docker inspect --format '{{.State.Status}}' "$cid" 2>/dev/null)
+        if [ "$cstatus" = "exited" ] || [ "$cstatus" = "dead" ]; then
+          cname=$(docker inspect --format '{{.Name}}' "$cid" 2>/dev/null | sed 's|^/||')
+          exitcode=$(docker inspect --format '{{.State.ExitCode}}' "$cid" 2>/dev/null)
+          echo "=== DEBUG[58375b] $(date -u +%H:%M:%S) DEAD container: ${cname} (${cid}) exit=${exitcode} ==="
+          echo "=== DEBUG[58375b] container Cmd ==="
+          docker inspect --format '{{.Config.Cmd}}' "$cid" 2>/dev/null | head -5 || true
+          echo "=== DEBUG[58375b] container logs ==="
+          docker logs "$cid" 2>&1 | tail -30 || true
+          echo "=== DEBUG[58375b] dmesg last 20 ==="
+          dmesg 2>/dev/null | tail -20 || true
+          echo "=== DEBUG[58375b] container journal ==="
+          docker cp "$cid":/var/log/journal /tmp/journal-diag-"$cid" 2>/dev/null && \
+            find /tmp/journal-diag-"$cid" -name '*.journal' -exec journalctl --file '{}' --no-pager \; 2>/dev/null | tail -50 || \
+            echo "(no journal)"
+          echo "=== DEBUG[58375b] end dead container $cid ==="
+        fi
+      done
+      sleep 2
+    done
+  ) &
+  CREATE_ENV_MONITOR_PID=$!
+  # #endregion agent log
+
+  create_env_exit=0
   bosh create-env "${local_bosh_dir}/bosh-director.yml" \
       --vars-store="${local_bosh_dir}/creds.yml" \
-      --state="${local_bosh_dir}/state.json"
+      --state="${local_bosh_dir}/state.json" || create_env_exit=$?
+
+  kill $CREATE_ENV_MONITOR_PID 2>/dev/null || true
+  wait $CREATE_ENV_MONITOR_PID 2>/dev/null || true
+
+  if [ "$create_env_exit" -ne 0 ]; then
+    echo "=== DEBUG[58375b] create-env failed (exit=${create_env_exit}) ==="
+    echo "=== DEBUG[58375b] all containers ==="
+    docker ps -a --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}' || true
+    for cid in $(docker ps -a -q 2>/dev/null); do
+      cname=$(docker inspect --format '{{.Name}}' "$cid" 2>/dev/null | sed 's|^/||')
+      cstatus=$(docker inspect --format '{{.State.Status}}' "$cid" 2>/dev/null)
+      exitcode=$(docker inspect --format '{{.State.ExitCode}}' "$cid" 2>/dev/null)
+      echo "=== DEBUG[58375b] container ${cname} (${cid}): status=${cstatus} exit=${exitcode} ==="
+      echo "=== DEBUG[58375b] Cmd ==="
+      docker inspect --format '{{.Config.Cmd}}' "$cid" 2>/dev/null | head -3 || true
+      echo "=== DEBUG[58375b] HostConfig ==="
+      docker inspect --format 'Privileged={{.HostConfig.Privileged}} CgroupnsMode={{.HostConfig.CgroupnsMode}} Binds={{.HostConfig.Binds}}' "$cid" 2>/dev/null || true
+      echo "=== DEBUG[58375b] logs ==="
+      docker logs "$cid" 2>&1 | tail -30 || true
+      echo "=== DEBUG[58375b] cgroup info from inside container ==="
+      docker exec "$cid" bash -c 'cat /proc/self/cgroup 2>/dev/null; echo "---"; ls -la /sys/fs/cgroup/ 2>/dev/null; echo "---"; cat /sys/fs/cgroup/cgroup.controllers 2>/dev/null; echo "---"; cat /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null' 2>/dev/null || true
+      echo "=== DEBUG[58375b] journal from container ==="
+      docker cp "$cid":/var/log/journal /tmp/journal-post-"$cid" 2>/dev/null && \
+        find /tmp/journal-post-"$cid" -name '*.journal' -exec journalctl --file '{}' --no-pager \; 2>/dev/null | tail -100 || echo "(no journal)"
+    done
+    echo "=== DEBUG[58375b] dmesg (last 40) ==="
+    dmesg 2>/dev/null | tail -40 || true
+    exit "$create_env_exit"
+  fi
 
   bosh int "${local_bosh_dir}/creds.yml" --path /director_ssl/ca > "${local_bosh_dir}/ca.crt"
   bosh_client_secret="$(bosh int "${local_bosh_dir}/creds.yml" --path /admin_password)"
