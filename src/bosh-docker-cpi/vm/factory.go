@@ -148,6 +148,11 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 
 	containerConfig.Cmd = dkrstrslice.StrSlice{"bash", "-c", strings.Join(startContainerCommands, " && ")}
 
+	// #region agent log — debug[58375b]: log startup config for hypothesis A/B
+	f.logger.Debug(f.logTag, "DEBUG[58375b] startContainersWithSystemD=%v cgroupnsMode=%s containerCmd=%s",
+		startContainersWithSystemD, vmProps.HostConfig.CgroupnsMode, strings.Join(startContainerCommands, " && "))
+	// #endregion agent log
+
 	if len(diskCIDs) > 0 {
 		node, err := f.possiblyFindNodeWithDisk(diskCIDs[0])
 		if err != nil {
@@ -221,6 +226,16 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		f.cleanUpContainer(container)
 		return Container{}, bosherr.WrapError(err, "Starting container")
 	}
+
+	// #region agent log — debug[58375b]: verify container is running after start (hypothesis A/C/E)
+	inspect, inspErr := f.dkrClient.ContainerInspect(context.TODO(), id.AsString())
+	if inspErr == nil {
+		f.logger.Debug(f.logTag, "DEBUG[58375b] container %s post-start: status=%s running=%v exitCode=%d pid=%d",
+			id.AsString(), inspect.State.Status, inspect.State.Running, inspect.State.ExitCode, inspect.State.Pid)
+	} else {
+		f.logger.Debug(f.logTag, "DEBUG[58375b] container %s post-start inspect error: %v", id.AsString(), inspErr)
+	}
+	// #endregion agent log
 
 	agentEnv := apiv1.AgentEnvFactory{}.ForVM(agentID, id, networks, env, f.agentOptions)
 	agentEnv.AttachSystemDisk(apiv1.NewDiskHintFromString(""))

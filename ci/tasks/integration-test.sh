@@ -273,12 +273,90 @@ EOF
   stemcell_file="$(find "${REPO_PARENT}/stemcell" -maxdepth 1 -path '*.tgz')"
   bosh -n upload-stemcell "${stemcell_file}"
 
+  # #region agent log — Hypothesis A: check if runsvdir-start exists in stemcell image
+  local stemcell_image
+  stemcell_image=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep -v '<none>' | head -1)
+  echo "=== DEBUG[58375b] stemcell image: ${stemcell_image} ==="
+  echo "=== DEBUG[58375b] checking runsvdir-start and /sbin/init in stemcell ==="
+  docker run --rm --entrypoint "" "${stemcell_image}" bash -c \
+    'echo "runsvdir-start exists: $(test -f /usr/sbin/runsvdir-start && echo YES || echo NO)"; \
+     echo "sbin/init exists: $(test -f /sbin/init && echo YES || echo NO)"; \
+     echo "systemd exists: $(test -f /lib/systemd/systemd && echo YES || echo NO)"; \
+     ls -la /usr/sbin/runsvdir-start /sbin/init /lib/systemd/systemd 2>&1 || true' \
+    || echo "DEBUG[58375b] failed to inspect stemcell image"
+  # #endregion agent log
+
+  # #region agent log — Hypothesis B/D: monitor new containers during deploy
+  echo "=== DEBUG[58375b] pre-deploy container list ==="
+  docker ps -a --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}'
+
+  local director_cid_pre
+  director_cid_pre=$(docker ps -q --filter "expose=25555" | head -1)
+  echo "=== DEBUG[58375b] director container id: ${director_cid_pre} ==="
+
+  (
+    seen_containers=""
+    while true; do
+      for cid in $(docker ps -a -q); do
+        if [ "$cid" = "$director_cid_pre" ]; then
+          continue
+        fi
+        cname=$(docker inspect --format '{{.Name}}' "$cid" 2>/dev/null | sed 's|^/||')
+        cstatus=$(docker inspect --format '{{.State.Status}}' "$cid" 2>/dev/null)
+        if [[ "$cname" == c-* ]]; then
+          if ! echo "$seen_containers" | grep -q "$cid"; then
+            seen_containers="${seen_containers} ${cid}"
+            echo "=== DEBUG[58375b] $(date -u +%H:%M:%S) NEW non-director container: ${cname} (${cid}) status=${cstatus} ==="
+            echo "=== DEBUG[58375b] container cmd ==="
+            docker inspect --format '{{.Config.Cmd}}' "$cid" 2>/dev/null || true
+            echo "=== DEBUG[58375b] container hostconfig ==="
+            docker inspect --format 'Privileged={{.HostConfig.Privileged}} CgroupnsMode={{.HostConfig.CgroupnsMode}} Binds={{.HostConfig.Binds}}' "$cid" 2>/dev/null || true
+          fi
+          if [ "$cstatus" = "exited" ] || [ "$cstatus" = "dead" ]; then
+            echo "=== DEBUG[58375b] $(date -u +%H:%M:%S) CONTAINER DIED: ${cname} (${cid}) ==="
+            docker inspect --format 'ExitCode={{.State.ExitCode}} Error={{.State.Error}}' "$cid" 2>/dev/null || true
+            echo "=== DEBUG[58375b] container logs ==="
+            docker logs "$cid" 2>&1 | tail -80 || true
+          fi
+        fi
+      done
+      sleep 2
+    done
+  ) &
+  MONITOR_PID=$!
+  # #endregion agent log
+
   deployment_name="integration-test"
 
+  deploy_exit=0
   bosh deploy --non-interactive \
     --deployment "${deployment_name}" \
     "${REPO_ROOT}/ci/tasks/integration-test-manifest.yml" \
-     --var deployment_name="${deployment_name}"
+     --var deployment_name="${deployment_name}" || deploy_exit=$?
+
+  # #region agent log — post-deploy diagnostics
+  echo "=== DEBUG[58375b] post-deploy container list ==="
+  docker ps -a --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}'
+
+  if [ "$deploy_exit" -ne 0 ]; then
+    echo "=== DEBUG[58375b] deploy failed (exit=${deploy_exit}), capturing CPI config ==="
+    docker exec "$(docker ps -q --filter name=c-)" bash -c \
+      'cat /var/vcap/jobs/docker_cpi/config/cpi.json 2>/dev/null' || echo "DEBUG[58375b] could not read cpi.json"
+
+    echo "=== DEBUG[58375b] CPI debug log ==="
+    docker exec "$(docker ps -q --filter name=c-)" bash -c \
+      'find /var/vcap -name "cpi.log" -o -name "docker_cpi*" 2>/dev/null | while read f; do echo "--- $f ---"; tail -100 "$f"; done' || true
+
+    echo "=== DEBUG[58375b] task debug log (last 200 lines) ==="
+    docker exec "$(docker ps -q --filter name=c-)" bash -c \
+      'find /var/vcap/data/director/tasks -name "debug" 2>/dev/null | sort -V | tail -1 | xargs tail -200 2>/dev/null' || true
+  fi
+
+  kill $MONITOR_PID 2>/dev/null || true
+  wait $MONITOR_PID 2>/dev/null || true
+  # #endregion agent log
+
+  exit $deploy_exit
 }
 
 main "${@}"
