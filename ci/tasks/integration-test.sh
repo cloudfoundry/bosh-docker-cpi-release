@@ -298,7 +298,26 @@ EOF
       echo "=== DEBUG[58375b] logs ==="
       docker logs "$cid" 2>&1 | tail -30 || true
       echo "=== DEBUG[58375b] cgroup info from inside container ==="
-      docker exec "$cid" bash -c 'cat /proc/self/cgroup 2>/dev/null; echo "---"; ls -la /sys/fs/cgroup/ 2>/dev/null; echo "---"; cat /sys/fs/cgroup/cgroup.controllers 2>/dev/null; echo "---"; cat /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null' 2>/dev/null || true
+      docker exec "$cid" bash -c 'cat /proc/self/cgroup 2>/dev/null; echo "---"; cat /sys/fs/cgroup/cgroup.controllers 2>/dev/null; echo "---"; cat /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null' 2>/dev/null || true
+      # #region agent log — debug[58375b]: detailed container diagnostics
+      echo "=== DEBUG[58375b] systemd units & processes ==="
+      docker exec "$cid" bash -c '
+        echo "--- systemctl status ---"
+        systemctl --no-pager status 2>&1 | head -30 || true
+        echo "--- failed units ---"
+        systemctl --no-pager --failed 2>&1 || true
+        echo "--- bosh-agent status ---"
+        systemctl --no-pager status bosh-agent 2>&1 || true
+        echo "--- listening ports ---"
+        ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null || true
+        echo "--- ps aux ---"
+        ps aux 2>/dev/null | head -40 || true
+        echo "--- /var/vcap/bosh/log/current ---"
+        tail -50 /var/vcap/bosh/log/current 2>/dev/null || true
+        echo "--- journalctl last 50 ---"
+        journalctl --no-pager -n 50 2>/dev/null || true
+      ' 2>/dev/null || echo "(docker exec failed -- container not running)"
+      # #endregion agent log
       echo "=== DEBUG[58375b] journal from container ==="
       docker cp "$cid":/var/log/journal /tmp/journal-post-"$cid" 2>/dev/null && \
         find /tmp/journal-post-"$cid" -name '*.journal' -exec journalctl --file '{}' --no-pager \; 2>/dev/null | tail -100 || echo "(no journal)"
