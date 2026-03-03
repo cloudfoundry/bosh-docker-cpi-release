@@ -134,26 +134,22 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		}, " ")
 
 		// cgroups v2 nesting: systemd as PID 1 needs subtree_control delegation
-		// on its own cgroup so it can create child cgroups for services.
-		// With cgroupns=host the container sees the full host hierarchy, so we
-		// find our own cgroup, move existing processes into an "init" child, and
-		// enable all available controllers on subtree_control.
+		// so it can create child cgroups for services. With cgroupns=private,
+		// the container sees /sys/fs/cgroup/ as its cgroup root. We move
+		// existing processes into an "init" child and enable all available
+		// controllers on subtree_control (same pattern as moby/moby hack/dind).
 		// #region agent log — debug[58375b]: cgroup nesting with echo diagnostics
 		cgroupNestingCmd := strings.Join([]string{
 			`echo "DEBUG[58375b] cgroup-nesting: start" >&2;`,
 			`if [ -f /sys/fs/cgroup/cgroup.controllers ]; then`,
-			`CGROUP_PATH=$(grep "^0::" /proc/self/cgroup | cut -d: -f3);`,
-			`echo "DEBUG[58375b] cgroup-nesting: cgroupv2 detected, path=$CGROUP_PATH" >&2;`,
-			`if [ -n "$CGROUP_PATH" ] && [ -d "/sys/fs/cgroup${CGROUP_PATH}" ]; then`,
-			`echo "DEBUG[58375b] cgroup-nesting: before procs=$(cat /sys/fs/cgroup${CGROUP_PATH}/cgroup.procs 2>/dev/null | tr '\n' ',') subtree=$(cat /sys/fs/cgroup${CGROUP_PATH}/cgroup.subtree_control 2>/dev/null)" >&2;`,
-			`mkdir -p "/sys/fs/cgroup${CGROUP_PATH}/init";`,
+			`echo "DEBUG[58375b] cgroup-nesting: cgroupv2, before procs=$(cat /sys/fs/cgroup/cgroup.procs 2>/dev/null | tr '\n' ',') subtree=$(cat /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null)" >&2;`,
+			`mkdir -p /sys/fs/cgroup/init;`,
 			`_NEST_I=0;`,
 			`while ! {`,
-			`xargs -rn1 < "/sys/fs/cgroup${CGROUP_PATH}/cgroup.procs" > "/sys/fs/cgroup${CGROUP_PATH}/init/cgroup.procs" 2>/dev/null || :;`,
-			`sed -e 's/ / +/g' -e 's/^/+/' < "/sys/fs/cgroup${CGROUP_PATH}/cgroup.controllers" > "/sys/fs/cgroup${CGROUP_PATH}/cgroup.subtree_control" 2>/dev/null;`,
-			`}; do _NEST_I=$((_NEST_I+1)); if [ $_NEST_I -ge 50 ]; then echo "DEBUG[58375b] cgroup-nesting: giving up after 50 iterations, procs=$(cat /sys/fs/cgroup${CGROUP_PATH}/cgroup.procs 2>/dev/null | tr '\n' ',')" >&2; break; fi; done;`,
-			`echo "DEBUG[58375b] cgroup-nesting: done iter=$_NEST_I subtree=$(cat /sys/fs/cgroup${CGROUP_PATH}/cgroup.subtree_control 2>/dev/null)" >&2;`,
-			`fi;`,
+			`xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs 2>/dev/null || :;`,
+			`sed -e 's/ / +/g' -e 's/^/+/' < /sys/fs/cgroup/cgroup.controllers > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null;`,
+			`}; do _NEST_I=$((_NEST_I+1)); if [ $_NEST_I -ge 50 ]; then echo "DEBUG[58375b] cgroup-nesting: giving up after 50 iterations" >&2; break; fi; done;`,
+			`echo "DEBUG[58375b] cgroup-nesting: done iter=$_NEST_I subtree=$(cat /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null)" >&2;`,
 			`else echo "DEBUG[58375b] cgroup-nesting: not cgroupv2" >&2;`,
 			`fi`,
 		}, " ")
@@ -199,8 +195,10 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	vmProps.HostConfig.PublishAllPorts = true //nolint:staticcheck
 
 	if startContainersWithSystemD {
-		// systemd requires access to the host cgroup hierarchy, especially with cgroups v2.
-		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModeHost //nolint:staticcheck
+		// Use a private cgroup namespace so systemd sees itself at the cgroup
+		// root (/). With cgroupns=host, systemd would see a deep path like
+		// /docker/<id>/init and fail to manage cgroups properly.
+		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModePrivate //nolint:staticcheck
 	}
 
 	for _, port := range vmProps.ExposedPorts {
@@ -214,12 +212,9 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		"/lib/modules:/usr/lib/modules", // make host kernel modules accessible
 	}
 
-	if startContainersWithSystemD {
-		// systemd needs read-write access to the cgroup filesystem to manage
-		// service cgroups. Without this mount, systemd may fail to initialize
-		// on cgroups v2 hosts.
-		binds = append(binds, "/sys/fs/cgroup:/sys/fs/cgroup:rw")
-	}
+	// With cgroupns=private, the kernel provides a cgroup2 mount at
+	// /sys/fs/cgroup scoped to the container's namespace automatically.
+	// No explicit bind mount is needed (and would defeat the namespace).
 
 	if lxcfsEnabled {
 		binds = append(binds, "/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw")

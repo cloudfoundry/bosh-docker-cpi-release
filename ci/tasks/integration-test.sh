@@ -311,8 +311,7 @@ EOF
     failed_image=$(docker inspect --format '{{.Config.Image}}' "$(docker ps -a -q | head -1)" 2>/dev/null) || true
     if [ -n "$failed_image" ]; then
       echo "=== DEBUG[58375b] test: running pre-start commands step by step ==="
-      docker run --rm --privileged --cgroupns=host \
-        -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+      docker run --rm --privileged --cgroupns=private \
         -v /lib/modules:/usr/lib/modules \
         "$failed_image" bash -c '
           set -x
@@ -328,22 +327,20 @@ EOF
             -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" \
             -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" \
             -not -name "*systemd-tmpfiles*" -exec rm {} \; 2>&1; echo "exit=$?"
-          echo "step10: cgroup state before nesting"
+          echo "step10: cgroup state before nesting (cgroupns=private)"
           cat /proc/self/cgroup 2>&1
-          MYCG=$(grep "^0::" /proc/self/cgroup | cut -d: -f3)
-          echo "my cgroup path: ${MYCG}"
-          cat "/sys/fs/cgroup${MYCG}/cgroup.controllers" 2>&1 || true
-          echo "subtree_control before: $(cat /sys/fs/cgroup${MYCG}/cgroup.subtree_control 2>/dev/null)"
-          echo "procs before: $(cat /sys/fs/cgroup${MYCG}/cgroup.procs 2>/dev/null | tr '\n' ',')"
+          cat /sys/fs/cgroup/cgroup.controllers 2>&1 || true
+          echo "subtree_control before: $(cat /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null)"
+          echo "procs before: $(cat /sys/fs/cgroup/cgroup.procs 2>/dev/null | tr '\n' ',')"
           echo "step10b: cgroup nesting"
           if [ -f /sys/fs/cgroup/cgroup.controllers ]; then
-            mkdir -p "/sys/fs/cgroup${MYCG}/init"
+            mkdir -p /sys/fs/cgroup/init
             _NI=0
             while ! {
-              xargs -rn1 < "/sys/fs/cgroup${MYCG}/cgroup.procs" > "/sys/fs/cgroup${MYCG}/init/cgroup.procs" 2>/dev/null || :
-              sed -e 's/ / +/g' -e 's/^/+/' < "/sys/fs/cgroup${MYCG}/cgroup.controllers" > "/sys/fs/cgroup${MYCG}/cgroup.subtree_control" 2>/dev/null
+              xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs 2>/dev/null || :
+              sed -e 's/ / +/g' -e 's/^/+/' < /sys/fs/cgroup/cgroup.controllers > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null
             }; do _NI=$((_NI+1)); if [ $_NI -ge 50 ]; then echo "nesting: gave up after 50 iters"; break; fi; done
-            echo "nesting: done iter=$_NI subtree=$(cat /sys/fs/cgroup${MYCG}/cgroup.subtree_control 2>/dev/null) procs=$(cat /sys/fs/cgroup${MYCG}/cgroup.procs 2>/dev/null | tr '\n' ',')"
+            echo "nesting: done iter=$_NI subtree=$(cat /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null) procs=$(cat /sys/fs/cgroup/cgroup.procs 2>/dev/null | tr '\n' ',')"
           fi
           echo "step11: attempting /sbin/init with timeout"
           timeout 5 /sbin/init --log-level=debug --log-target=console 2>&1 || echo "init exited with $?"
