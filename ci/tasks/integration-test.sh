@@ -305,6 +305,45 @@ EOF
     done
     echo "=== DEBUG[58375b] dmesg (last 40) ==="
     dmesg 2>/dev/null | tail -40 || true
+
+    echo "=== DEBUG[58375b] reproducing with verbose startup to find failure point ==="
+    local failed_image
+    failed_image=$(docker inspect --format '{{.Config.Image}}' "$(docker ps -a -q | head -1)" 2>/dev/null) || true
+    if [ -n "$failed_image" ]; then
+      echo "=== DEBUG[58375b] test: running pre-start commands step by step ==="
+      docker run --rm --privileged --cgroupns=host \
+        -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+        -v /lib/modules:/usr/lib/modules \
+        "$failed_image" bash -c '
+          set -x
+          echo "step1: umount resolv.conf" && umount /etc/resolv.conf 2>&1; echo "exit=$?"
+          echo "step2: write resolv.conf" && printf "%s\n" "nameserver 8.8.8.8" > /etc/resolv.conf 2>&1; echo "exit=$?"
+          echo "step3: umount hosts" && umount /etc/hosts 2>&1; echo "exit=$?"
+          echo "step4: umount hostname" && umount /etc/hostname 2>&1; echo "exit=$?"
+          echo "step5: mkdir data/sys" && rm -rf /var/vcap/data/sys && mkdir -p /var/vcap/data/sys 2>&1; echo "exit=$?"
+          echo "step6: mkdir store" && mkdir -p /var/vcap/store 2>&1; echo "exit=$?"
+          echo "step7: sed chronyc" && sed -i "s/chronyc/# chronyc/g" /var/vcap/bosh/bin/sync-time 2>&1; echo "exit=$?"
+          echo "step8: rm sv" && rm -rf /etc/sv/{ssh,cron} && rm -rf /etc/service/{ssh,cron} 2>&1; echo "exit=$?"
+          echo "step9: find/delete units" && find /etc/systemd/system /lib/systemd/system -path "*.wants/*" \
+            -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" \
+            -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" \
+            -not -name "*systemd-tmpfiles*" -exec rm {} \; 2>&1; echo "exit=$?"
+          echo "step10: cgroup state before init"
+          cat /proc/self/cgroup 2>&1
+          ls /sys/fs/cgroup/ 2>&1
+          cat /sys/fs/cgroup/cgroup.controllers 2>&1 || true
+          cat /sys/fs/cgroup/cgroup.subtree_control 2>&1 || true
+          MYCG=$(grep "^0::" /proc/self/cgroup | cut -d: -f3)
+          echo "my cgroup path: ${MYCG}"
+          ls "/sys/fs/cgroup${MYCG}/" 2>&1 || true
+          cat "/sys/fs/cgroup${MYCG}/cgroup.controllers" 2>&1 || true
+          cat "/sys/fs/cgroup${MYCG}/cgroup.subtree_control" 2>&1 || true
+          cat "/sys/fs/cgroup${MYCG}/cgroup.procs" 2>&1 || true
+          echo "step11: attempting /sbin/init with timeout"
+          timeout 5 /sbin/init --log-level=debug --log-target=console 2>&1 || echo "init exited with $?"
+        ' 2>&1 || echo "DEBUG[58375b] test container exited with $?"
+    fi
+
     exit "$create_env_exit"
   fi
 
