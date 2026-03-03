@@ -96,11 +96,14 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		Env:          []string{"reschedule:on-node-failure"},
 	}
 
-	// todo hacky umount to avoid conflicting with bosh dns updates
-	// todo why perms are wrong on /var/vcap/data
-	// todo dont need to create /var/vcap/store
+	// Umount Docker's bind-mounted /etc/resolv.conf, /etc/hosts, and /etc/hostname
+	// so the BOSH agent and BOSH DNS can manage these files freely.
+	// After unmounting /etc/resolv.conf, write a new one with DNS servers from
+	// the network spec so that processes have working DNS resolution before the
+	// BOSH agent takes over.
 	preStartCommands := []string{
 		`umount /etc/resolv.conf`,
+		populateResolveConf(networks),
 		`umount /etc/hosts`,
 		`umount /etc/hostname`,
 		networkInitBashCmd,
@@ -270,6 +273,21 @@ func (f Factory) possiblyFindNodeWithDisk(diskID apiv1.DiskCID) (string, error) 
 
 	// Did not find volume on any nodes
 	return "", nil
+}
+
+func populateResolveConf(networks apiv1.Networks) string {
+	var nameserverEntries []string
+	for _, network := range networks {
+		for _, dnsServer := range network.DNS() {
+			nameserverEntries = append(nameserverEntries, fmt.Sprintf(`"nameserver %s"`, dnsServer))
+		}
+	}
+
+	if len(nameserverEntries) == 0 {
+		return ":" // no-op bash command
+	}
+
+	return fmt.Sprintf(`printf '%%s\n' %s > /etc/resolv.conf`, strings.Join(nameserverEntries, " "))
 }
 
 func (f Factory) cleanMounts(vmProps Props) Props {
