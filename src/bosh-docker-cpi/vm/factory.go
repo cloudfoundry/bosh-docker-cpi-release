@@ -138,18 +138,26 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		// With cgroupns=host the container sees the full host hierarchy, so we
 		// find our own cgroup, move existing processes into an "init" child, and
 		// enable all available controllers on subtree_control.
+		// #region agent log — debug[58375b]: cgroup nesting with echo diagnostics
 		cgroupNestingCmd := strings.Join([]string{
+			`echo "DEBUG[58375b] cgroup-nesting: start" >&2;`,
 			`if [ -f /sys/fs/cgroup/cgroup.controllers ]; then`,
 			`CGROUP_PATH=$(grep "^0::" /proc/self/cgroup | cut -d: -f3);`,
+			`echo "DEBUG[58375b] cgroup-nesting: cgroupv2 detected, path=$CGROUP_PATH" >&2;`,
 			`if [ -n "$CGROUP_PATH" ] && [ -d "/sys/fs/cgroup${CGROUP_PATH}" ]; then`,
+			`echo "DEBUG[58375b] cgroup-nesting: before procs=$(cat /sys/fs/cgroup${CGROUP_PATH}/cgroup.procs 2>/dev/null | tr '\n' ',') subtree=$(cat /sys/fs/cgroup${CGROUP_PATH}/cgroup.subtree_control 2>/dev/null)" >&2;`,
 			`mkdir -p "/sys/fs/cgroup${CGROUP_PATH}/init";`,
+			`_NEST_I=0;`,
 			`while ! {`,
 			`xargs -rn1 < "/sys/fs/cgroup${CGROUP_PATH}/cgroup.procs" > "/sys/fs/cgroup${CGROUP_PATH}/init/cgroup.procs" 2>/dev/null || :;`,
-			`sed -e 's/ / +/g' -e 's/^/+/' < "/sys/fs/cgroup${CGROUP_PATH}/cgroup.controllers" > "/sys/fs/cgroup${CGROUP_PATH}/cgroup.subtree_control";`,
-			`}; do :; done;`,
+			`sed -e 's/ / +/g' -e 's/^/+/' < "/sys/fs/cgroup${CGROUP_PATH}/cgroup.controllers" > "/sys/fs/cgroup${CGROUP_PATH}/cgroup.subtree_control" 2>/dev/null;`,
+			`}; do _NEST_I=$((_NEST_I+1)); if [ $_NEST_I -ge 50 ]; then echo "DEBUG[58375b] cgroup-nesting: giving up after 50 iterations, procs=$(cat /sys/fs/cgroup${CGROUP_PATH}/cgroup.procs 2>/dev/null | tr '\n' ',')" >&2; break; fi; done;`,
+			`echo "DEBUG[58375b] cgroup-nesting: done iter=$_NEST_I subtree=$(cat /sys/fs/cgroup${CGROUP_PATH}/cgroup.subtree_control 2>/dev/null)" >&2;`,
 			`fi;`,
+			`else echo "DEBUG[58375b] cgroup-nesting: not cgroupv2" >&2;`,
 			`fi`,
 		}, " ")
+		// #endregion agent log
 
 		preStartCommands = append(preStartCommands, []string{
 			`rm -rf /etc/sv/{ssh,cron}`,
@@ -158,7 +166,9 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 			cgroupNestingCmd,
 		}...)
 
-		startContainerCommands = append(preStartCommands, `exec /sbin/init`)
+		startContainerCommands = append(preStartCommands,
+			`echo "DEBUG[58375b] about to exec /sbin/init" >&2`,
+			`exec /sbin/init`)
 	} else {
 		preStartCommands = append(preStartCommands, []string{}...)
 

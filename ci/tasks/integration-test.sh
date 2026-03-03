@@ -328,17 +328,23 @@ EOF
             -not -name "*bosh-agent*" -not -name "*journald*" -not -name "*logrotate*" \
             -not -name "*runit*" -not -name "*ssh*" -not -name "*systemd-user-sessions*" \
             -not -name "*systemd-tmpfiles*" -exec rm {} \; 2>&1; echo "exit=$?"
-          echo "step10: cgroup state before init"
+          echo "step10: cgroup state before nesting"
           cat /proc/self/cgroup 2>&1
-          ls /sys/fs/cgroup/ 2>&1
-          cat /sys/fs/cgroup/cgroup.controllers 2>&1 || true
-          cat /sys/fs/cgroup/cgroup.subtree_control 2>&1 || true
           MYCG=$(grep "^0::" /proc/self/cgroup | cut -d: -f3)
           echo "my cgroup path: ${MYCG}"
-          ls "/sys/fs/cgroup${MYCG}/" 2>&1 || true
           cat "/sys/fs/cgroup${MYCG}/cgroup.controllers" 2>&1 || true
-          cat "/sys/fs/cgroup${MYCG}/cgroup.subtree_control" 2>&1 || true
-          cat "/sys/fs/cgroup${MYCG}/cgroup.procs" 2>&1 || true
+          echo "subtree_control before: $(cat /sys/fs/cgroup${MYCG}/cgroup.subtree_control 2>/dev/null)"
+          echo "procs before: $(cat /sys/fs/cgroup${MYCG}/cgroup.procs 2>/dev/null | tr '\n' ',')"
+          echo "step10b: cgroup nesting"
+          if [ -f /sys/fs/cgroup/cgroup.controllers ]; then
+            mkdir -p "/sys/fs/cgroup${MYCG}/init"
+            _NI=0
+            while ! {
+              xargs -rn1 < "/sys/fs/cgroup${MYCG}/cgroup.procs" > "/sys/fs/cgroup${MYCG}/init/cgroup.procs" 2>/dev/null || :
+              sed -e 's/ / +/g' -e 's/^/+/' < "/sys/fs/cgroup${MYCG}/cgroup.controllers" > "/sys/fs/cgroup${MYCG}/cgroup.subtree_control" 2>/dev/null
+            }; do _NI=$((_NI+1)); if [ $_NI -ge 50 ]; then echo "nesting: gave up after 50 iters"; break; fi; done
+            echo "nesting: done iter=$_NI subtree=$(cat /sys/fs/cgroup${MYCG}/cgroup.subtree_control 2>/dev/null) procs=$(cat /sys/fs/cgroup${MYCG}/cgroup.procs 2>/dev/null | tr '\n' ',')"
+          fi
           echo "step11: attempting /sbin/init with timeout"
           timeout 5 /sbin/init --log-level=debug --log-target=console 2>&1 || echo "init exited with $?"
         ' 2>&1 || echo "DEBUG[58375b] test container exited with $?"
