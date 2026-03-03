@@ -140,14 +140,14 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		// enable all available controllers on subtree_control.
 		cgroupNestingCmd := strings.Join([]string{
 			`if [ -f /sys/fs/cgroup/cgroup.controllers ]; then`,
-			`  CGROUP_PATH=$(grep "^0::" /proc/self/cgroup | cut -d: -f3)`,
-			`  if [ -n "$CGROUP_PATH" ] && [ -d "/sys/fs/cgroup${CGROUP_PATH}" ]; then`,
-			`    mkdir -p "/sys/fs/cgroup${CGROUP_PATH}/init"`,
-			`    while ! {`,
-			`      xargs -rn1 < "/sys/fs/cgroup${CGROUP_PATH}/cgroup.procs" > "/sys/fs/cgroup${CGROUP_PATH}/init/cgroup.procs" 2>/dev/null || :;`,
-			`      sed -e 's/ / +/g' -e 's/^/+/' < "/sys/fs/cgroup${CGROUP_PATH}/cgroup.controllers" > "/sys/fs/cgroup${CGROUP_PATH}/cgroup.subtree_control";`,
-			`    }; do :; done`,
-			`  fi`,
+			`CGROUP_PATH=$(grep "^0::" /proc/self/cgroup | cut -d: -f3);`,
+			`if [ -n "$CGROUP_PATH" ] && [ -d "/sys/fs/cgroup${CGROUP_PATH}" ]; then`,
+			`mkdir -p "/sys/fs/cgroup${CGROUP_PATH}/init";`,
+			`while ! {`,
+			`xargs -rn1 < "/sys/fs/cgroup${CGROUP_PATH}/cgroup.procs" > "/sys/fs/cgroup${CGROUP_PATH}/init/cgroup.procs" 2>/dev/null || :;`,
+			`sed -e 's/ / +/g' -e 's/^/+/' < "/sys/fs/cgroup${CGROUP_PATH}/cgroup.controllers" > "/sys/fs/cgroup${CGROUP_PATH}/cgroup.subtree_control";`,
+			`}; do :; done;`,
+			`fi;`,
 			`fi`,
 		}, " ")
 
