@@ -158,8 +158,6 @@ function start_docker() {
 }
 EOF
 
-  trap stop_docker EXIT
-
   service docker start
 
   rc=1
@@ -204,13 +202,13 @@ function main() {
   local_bosh_dir="/tmp/local-bosh/director"
   mkdir -p ${local_bosh_dir}
 
-  cat <<EOF > "${local_bosh_dir}/docker-env"
-export DOCKER_HOST="tcp://${OUTER_CONTAINER_IP}:4243"
-export DOCKER_TLS_VERIFY=1
-export DOCKER_CERT_PATH="${certs_dir}"
-
-EOF
-  echo "Source '${local_bosh_dir}/docker-env' to run docker" >&2
+  docker_env_file="${local_bosh_dir}/docker-env"
+  {
+    echo "export DOCKER_HOST=\"tcp://${OUTER_CONTAINER_IP}:4243\""
+    echo "export DOCKER_TLS_VERIFY=\"1\""
+    echo "export DOCKER_CERT_PATH=\"${certs_dir}\""
+  } > "${docker_env_file}"
+  echo "Source '${docker_env_file}' to run docker" >&2
   source "${local_bosh_dir}/docker-env"
 
   start_docker "${certs_dir}"
@@ -223,13 +221,13 @@ EOF
     docker network create -d bridge --subnet="${docker_network_cidr}" "${docker_network_name}"
   fi
 
-  cat <<EOF > "${local_bosh_dir}/docker_tls.json"
+  docker_tls_json="${local_bosh_dir}/docker_tls.json"
+  cat <<EOF > "${docker_tls_json}"
 {
   "ca": "$(cat "${certs_dir}/ca_json_safe.pem")",
   "certificate": "$(cat "${certs_dir}/client_certificate_json_safe.pem")",
   "private_key": "$(cat "${certs_dir}/client_private_key_json_safe.pem")"
 }
-
 EOF
 
   bosh int "${BOSH_DEPLOYMENT_PATH}/bosh.yml" \
@@ -251,23 +249,26 @@ EOF
       --state="${local_bosh_dir}/state.json"
 
   bosh int "${local_bosh_dir}/creds.yml" --path /director_ssl/ca > "${local_bosh_dir}/ca.crt"
-  bosh_client_secret="$(bosh int "${local_bosh_dir}/creds.yml" --path /admin_password)"
+  BOSH_CLIENT_SECRET="$(bosh int "${local_bosh_dir}/creds.yml" --path /admin_password)"
 
   bosh -e "${BOSH_DIRECTOR_IP}" --ca-cert "${local_bosh_dir}/ca.crt" alias-env "${BOSH_ENVIRONMENT}"
 
-  cat <<EOF > "${local_bosh_dir}/env"
-  export BOSH_DIRECTOR_IP="${BOSH_DIRECTOR_IP}"
-  export BOSH_ENVIRONMENT="${BOSH_ENVIRONMENT}"
-  export BOSH_CLIENT=admin
-  export BOSH_CLIENT_SECRET=${bosh_client_secret}
-  export BOSH_CA_CERT="${local_bosh_dir}/ca.crt"
+  bosh_env_file="${local_bosh_dir}/bosh-env"
+  {
+    echo "source \"${docker_env_file}\""
+    echo "export BOSH_DIRECTOR_IP=\"${BOSH_DIRECTOR_IP}\""
+    echo "export BOSH_ENVIRONMENT=\"${BOSH_ENVIRONMENT}\""
+    echo "export BOSH_CLIENT=\"admin\""
+    echo "export BOSH_CLIENT_SECRET=\"${BOSH_CLIENT_SECRET}\""
+    echo "export BOSH_CA_CERT=\"${local_bosh_dir}/ca.crt\""
+  } > "${bosh_env_file}"
 
-EOF
+  echo "Source '${bosh_env_file}' to run bosh" >&2
+  # shellcheck disable=SC1090
+  source "${bosh_env_file}"
 
-  echo "Source '${local_bosh_dir}/env' to run bosh" >&2
-  source "${local_bosh_dir}/env"
-
-  bosh -n update-cloud-config "${BOSH_DEPLOYMENT_PATH}/docker/cloud-config.yml" \
+  bosh -n update-cloud-config \
+   "${BOSH_DEPLOYMENT_PATH}/docker/cloud-config.yml" \
     -v network="${docker_network_name}"
 
   stemcell_file="$(find "${REPO_PARENT}/stemcell" -maxdepth 1 -path '*.tgz')"
