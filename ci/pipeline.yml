@@ -282,10 +282,9 @@ resources:
   - name: docker-cpi-image
     type: registry-image
     source:
-      repository: bosh/docker-cpi
-      tag: latest
-      username: ((dockerhub_username))
-      password: ((dockerhub_password))
+      repository: ghcr.io/cloudfoundry/bosh/docker-cpi
+      username: ((github_read_write_packages.username))
+      password: ((github_read_write_packages.password))
 
   - name: ci-image
     type: registry-image
