@@ -125,6 +125,12 @@ function start_docker() {
 
   sanitize_cgroups
 
+  # Raise inotify limits so nested containers running systemd don't exhaust
+  # file descriptors. Systemd and containerd's cgroup-v2 event monitor both
+  # use inotify; the default max_user_instances (128) was too low.
+  sysctl -w fs.inotify.max_user_instances=1024
+  sysctl -w fs.inotify.max_user_watches=524288
+
   # systemd inside nested Docker containers requires shared mount propagation
   mount --make-rshared /
 
