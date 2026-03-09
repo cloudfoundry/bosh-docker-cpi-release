@@ -279,7 +279,8 @@ EOF
   bosh deploy --non-interactive \
     --deployment "${deployment_name}" \
     "${REPO_ROOT}/ci/tasks/integration-test-manifest.yml" \
-     --var deployment_name="${deployment_name}"
+     --var deployment_name="${deployment_name}" \
+     --vars-store="${deployment_name}-creds.yml"
 }
 
 main "${@}"
