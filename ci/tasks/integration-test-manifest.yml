@@ -1,7 +1,14 @@
+---
 name: ((deployment_name))
 
+update:
+  canaries: 0
+  canary_watch_time: 1000-60000
+  max_in_flight: 100%
+  update_watch_time: 1000-60000
+
 instance_groups:
-  - name: "test-instance"
+  - name: test-instance
     azs:
       - z1
     instances: 1
@@ -10,6 +17,17 @@ instance_groups:
     stemcell: noble
     vm_type: default
     jobs:
+      - name: bosh-dns
+        release: bosh-dns
+        properties:
+          configure_systemd_resolved: true
+          disable_recursors: true
+          override_nameserver: false
+          api:
+            client:
+              tls: ((dns_api_client_tls))
+            server:
+              tls: ((dns_api_server_tls))
       - name: post-deploy-script
         release: os-conf
         properties:
@@ -18,6 +36,9 @@ instance_groups:
             echo success
 
 releases:
+  - name: bosh-dns
+    url: "https://bosh.io/d/github.com/cloudfoundry/bosh-dns-release"
+    version: latest
   - name: os-conf
     url: "https://bosh.io/d/github.com/cloudfoundry/os-conf-release"
     version: latest
@@ -27,8 +48,29 @@ stemcells:
     os: ubuntu-noble
     version: latest
 
-update:
-  canaries: 0
-  canary_watch_time: 1000-60000
-  max_in_flight: 100%
-  update_watch_time: 1000-60000
+variables:
+  - name: dns_api_tls_ca
+    type: certificate
+    options:
+      common_name: dns-api-tls-ca
+      is_ca: true
+
+  - name: dns_api_server_tls
+    type: certificate
+    options:
+      alternative_names:
+        - api.bosh-dns
+      ca: dns_api_tls_ca
+      common_name: api.bosh-dns
+      extended_key_usage:
+        - server_auth
+
+  - name: dns_api_client_tls
+    type: certificate
+    options:
+      alternative_names:
+        - api.bosh-dns
+      ca: dns_api_tls_ca
+      common_name: api.bosh-dns
+      extended_key_usage:
+        - client_auth
