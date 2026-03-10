@@ -2,9 +2,9 @@
 platform: linux
 inputs:
   - name: bosh-docker-cpi-release
+  - name: bosh-docker-cpi-release-ci
   - name: bosh-deployment
-  - name: ci
   - name: bosh-cpi-dev-artifacts
   - name: stemcell
 run:
-  path: ci/ci/tasks/integration-test.sh
+  path: bosh-docker-cpi-release-ci/ci/tasks/integration-test.sh

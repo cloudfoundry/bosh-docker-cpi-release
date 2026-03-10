@@ -5,11 +5,12 @@ jobs:
       - in_parallel:
         - get: bosh-docker-cpi-release
           trigger: true
-        - get: ci
-        - get: ci-image
+        - get: bosh-docker-cpi-release-ci
+          disable_git_lfs: true
+        - get: bosh-integration-image
       - task: unit-tests
         file: ci/ci/tasks/unit-tests.yml
-        image: ci-image
+        image: bosh-integration-image
 
   - name: integration-test
     plan:
@@ -19,7 +20,8 @@ jobs:
         passed:
         - unit-test
       - get: bosh-deployment
-      - get: ci
+      - get: bosh-docker-cpi-release-ci
+        disable_git_lfs: true
       - get: docker-cpi-image
       - get: bosh-cli-registry-image
       - get: bosh-shared-ci
@@ -131,7 +133,7 @@ jobs:
           repository: release_repo
           rebase: true
           tag: release_metadata/tag-name
-      - put: github-release
+      - put: bosh-docker-cpi-github-release
         params:
           name: release_metadata/version
           tag: release_metadata/version
@@ -168,11 +170,12 @@ jobs:
     - in_parallel:
       - get: bosh-docker-cpi-release
       - get: golang-release
-      - get: ci
+      - get: bosh-docker-cpi-release-ci
+        disable_git_lfs: true
       - get: weekly
         trigger: true
       - get: golang-release-registry-image
-      - get: ci-image
+      - get: bosh-integration-image
     - task: bump-deps
       file: golang-release/ci/tasks/shared/bump-deps.yml
       image: golang-release-registry-image
@@ -184,7 +187,7 @@ jobs:
         SOURCE_PATH: src/bosh-docker-cpi
     - task: unit-tests
       file: ci/ci/tasks/unit-tests.yml
-      image: ci-image
+      image: bosh-integration-image
     - put: bosh-docker-cpi-release
       params:
         repository: bosh-docker-cpi-release
@@ -228,9 +231,18 @@ resources:
   - name: bosh-docker-cpi-release
     type: git
     source:
+      ignore_paths:
+        - ci
       uri: git@github.com:cloudfoundry/bosh-docker-cpi-release.git
       private_key: ((github_deploy_key_bosh-docker-cpi-release.private_key))
-      branch: master
+
+  - name: bosh-docker-cpi-release-ci
+    type: git
+    source:
+      paths:
+        - ci
+      uri: git@github.com:cloudfoundry/bosh-docker-cpi-release.git
+      private_key: ((github_deploy_key_bosh-docker-cpi-release.private_key))
 
   - name: bosh-shared-ci
     type: git
@@ -249,15 +261,7 @@ resources:
       uri: https://github.com/cloudfoundry/bosh-deployment.git
       branch: master
 
-  - name: ci
-    type: git
-    source:
-      paths:
-        - ci/*
-      uri: git@github.com:cloudfoundry/bosh-docker-cpi-release.git
-      private_key: ((github_deploy_key_bosh-docker-cpi-release.private_key))
-
-  - name: github-release
+  - name: bosh-docker-cpi-github-release
     type: github-release
     source:
       owner: cloudfoundry
@@ -279,6 +283,13 @@ resources:
       json_key: ((gcp_json_key))
       key: semver/current-release-version
 
+  - name: bosh-integration-image
+    type: registry-image
+    source:
+      repository: ghcr.io/cloudfoundry/bosh/integration
+      username: ((github_read_write_packages.username))
+      password: ((github_read_write_packages.password))
+
   - name: docker-cpi-image
     type: registry-image
     source:
@@ -286,13 +297,10 @@ resources:
       username: ((github_read_write_packages.username))
       password: ((github_read_write_packages.password))
 
-  - name: ci-image
+  - name: golang-release-registry-image
     type: registry-image
     source:
-      repository: bosh/integration
-      tag: latest
-      username: ((dockerhub_username))
-      password: ((dockerhub_password))
+      repository: ghcr.io/cloudfoundry/bosh/golang-release
 
   - name: bosh-cli-registry-image
     type: registry-image
@@ -300,11 +308,6 @@ resources:
       repository: bosh/cli
       username: ((dockerhub_username))
       password: ((dockerhub_password))
-
-  - name: golang-release-registry-image
-    type: registry-image
-    source:
-      repository: ghcr.io/cloudfoundry/bosh/golang-release
 
   - name: bosh-security-scanner-registry-image
     type: registry-image
@@ -325,7 +328,6 @@ resource_types:
     repository: frodenas/gcs-resource
 
 - name: bosh-io-stemcell
+  type: docker-image
   source:
     repository: foundationalinfrastructure/bosh-io-stemcell-resource
-    tag: v1.2.1
-  type: docker-image

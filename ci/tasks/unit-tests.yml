@@ -2,6 +2,6 @@
 platform: linux
 inputs:
   - name: bosh-docker-cpi-release
-  - name: ci
+  - name: bosh-docker-cpi-release-ci
 run:
-  path: ci/ci/tasks/unit-tests.sh
+  path: bosh-docker-cpi-release-ci/ci/tasks/unit-tests.sh
