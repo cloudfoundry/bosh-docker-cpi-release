@@ -103,7 +103,6 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	// BOSH agent takes over.
 	preStartCommands := []string{
 		`umount /etc/resolv.conf`,
-		populateResolveConf(networks),
 		`umount /etc/hosts`,
 		`umount /etc/hostname`,
 		networkInitBashCmd,
@@ -135,6 +134,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		}, " ")
 
 		preStartCommands = append(preStartCommands, []string{
+			`ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf`,
 			`rm -rf /etc/sv/{ssh,cron}`,
 			`rm -rf /etc/service/{ssh,cron}`,
 			deleteUnwantedUnitsCommand,
@@ -142,7 +142,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 
 		startContainerCommands = append(preStartCommands, `exec /sbin/init`)
 	} else {
-		preStartCommands = append(preStartCommands, []string{}...)
+		preStartCommands = append(preStartCommands, []string{populateResolveConf(networks)}...)
 
 		startContainerCommands = append(preStartCommands, `exec env -i /usr/sbin/runsvdir-start`)
 	}
