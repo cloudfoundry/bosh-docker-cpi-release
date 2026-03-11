@@ -14,8 +14,8 @@ github.com/charlievieth/fs v0.0.3 h1:3lZQXTj4PbE81CVPwALSn+JoyCNXkZgORHN6h2XHGlg
 github.com/charlievieth/fs v0.0.3/go.mod h1:hD4sRzto1Hw8zCua76tNVKZxaeZZr1RiKftjAJQRLLo=
 github.com/cloudfoundry/bosh-cpi-go v0.0.0-20260307100329-8dca50ad93e3 h1:Eg+K+/iOPR/ouUFjVHPMRO/DA7RrFg2ECz2Rei6lwc8=
 github.com/cloudfoundry/bosh-cpi-go v0.0.0-20260307100329-8dca50ad93e3/go.mod h1:kTKPGUC0S6twhvY2Jx+XV91j+2PmAVfNh8Vx+C+285o=
-github.com/cloudfoundry/bosh-utils v0.0.595 h1:6QO833xSEFDbSOnYzBvs00sCqjgZiZtvHhhCWHgiU44=
-github.com/cloudfoundry/bosh-utils v0.0.595/go.mod h1:brIAPuZN3S4tEbatJtgsAC4SFOaPSsq61cCKG3VFrNg=
+github.com/cloudfoundry/bosh-utils v0.0.596 h1:YvaLBD6CPPEaW8nV9LxgPly+o3qPY3/ouiMryHk0qmY=
+github.com/cloudfoundry/bosh-utils v0.0.596/go.mod h1:brIAPuZN3S4tEbatJtgsAC4SFOaPSsq61cCKG3VFrNg=
 github.com/containerd/errdefs v1.0.0 h1:tg5yIfIlQIrxYtu9ajqY42W3lpS19XqdxRQeEwYG8PI=
 github.com/containerd/errdefs v1.0.0/go.mod h1:+YBYIdtsnF4Iw6nWZhJcqGSg/dwvV7tyJ/kCkyJ2k+M=
 github.com/containerd/errdefs/pkg v0.3.0 h1:9IKJ06FvyNlexW690DXuQNx2KA2cUJXx151Xdx3ZPPE=
