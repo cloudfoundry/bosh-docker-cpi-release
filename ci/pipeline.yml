@@ -6,10 +6,11 @@ jobs:
         - get: bosh-docker-cpi-release
           trigger: true
         - get: bosh-docker-cpi-release-ci
-          disable_git_lfs: true
+          params:
+            disable_git_lfs: true
         - get: bosh-integration-image
       - task: unit-tests
-        file: ci/ci/tasks/unit-tests.yml
+        file: bosh-docker-cpi-release-ci/ci/tasks/unit-tests.yml
         image: bosh-integration-image
 
   - name: integration-test
@@ -21,7 +22,8 @@ jobs:
         - unit-test
       - get: bosh-deployment
       - get: bosh-docker-cpi-release-ci
-        disable_git_lfs: true
+        params:
+          disable_git_lfs: true
       - get: docker-cpi-image
       - get: bosh-cli-registry-image
       - get: bosh-shared-ci
@@ -35,7 +37,7 @@ jobs:
       output_mapping:
         release_tarball: bosh-cpi-dev-artifacts
     - task: integration-test
-      file: ci/ci/tasks/integration-test.yml
+      file: bosh-docker-cpi-release-ci/ci/tasks/integration-test.yml
       privileged: true
       image: docker-cpi-image
 
@@ -171,7 +173,8 @@ jobs:
       - get: bosh-docker-cpi-release
       - get: golang-release
       - get: bosh-docker-cpi-release-ci
-        disable_git_lfs: true
+        params:
+          disable_git_lfs: true
       - get: weekly
         trigger: true
       - get: golang-release-registry-image
@@ -186,7 +189,7 @@ jobs:
       params:
         SOURCE_PATH: src/bosh-docker-cpi
     - task: unit-tests
-      file: ci/ci/tasks/unit-tests.yml
+      file: bosh-docker-cpi-release-ci/ci/tasks/unit-tests.yml
       image: bosh-integration-image
     - put: bosh-docker-cpi-release
       params:
@@ -235,6 +238,7 @@ resources:
         - ci
       uri: git@github.com:cloudfoundry/bosh-docker-cpi-release.git
       private_key: ((github_deploy_key_bosh-docker-cpi-release.private_key))
+      branch: master
 
   - name: bosh-docker-cpi-release-ci
     type: git
@@ -331,3 +335,4 @@ resource_types:
   type: docker-image
   source:
     repository: foundationalinfrastructure/bosh-io-stemcell-resource
+    tag: v1.2.1
