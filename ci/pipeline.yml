@@ -327,12 +327,12 @@ resources:
 
 resource_types:
 - name: gcs-resource
-  type: docker-image
+  type: registry-image
   source:
     repository: frodenas/gcs-resource
 
 - name: bosh-io-stemcell
-  type: docker-image
+  type: registry-image
   source:
     repository: foundationalinfrastructure/bosh-io-stemcell-resource
     tag: v1.2.1
