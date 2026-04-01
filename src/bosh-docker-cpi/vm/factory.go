@@ -115,29 +115,10 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	var startContainerCommands []string
 
 	if startContainersWithSystemD {
-		// only load minimal set of systemd units / services
-		// https://github.com/asg1612/docker-systemd/blob/master/Dockerfile
-		deleteUnwantedUnitsCommand := strings.Join([]string{
-			`find`,
-			`/etc/systemd/system`,
-			`/lib/systemd/system`,
-			`-path '*.wants/*' `,
-			`-not -name '*bosh-agent*'`,
-			`-not -name '*dbus*'`,
-			`-not -name '*journald*'`,
-			`-not -name '*logrotate*' `,
-			`-not -name '*runit*'`,
-			`-not -name '*ssh*'`,
-			`-not -name '*systemd-user-sessions*'`,
-			`-not -name '*systemd-tmpfiles*'`,
-			`-exec rm \{} \;`,
-		}, " ")
-
 		preStartCommands = append(preStartCommands, []string{
 			`ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf`,
 			`rm -rf /etc/sv/{ssh,cron}`,
 			`rm -rf /etc/service/{ssh,cron}`,
-			deleteUnwantedUnitsCommand,
 		}...)
 
 		startContainerCommands = append(preStartCommands, `exec /sbin/init`)
