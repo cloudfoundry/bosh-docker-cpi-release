@@ -3,8 +3,8 @@ module bosh-docker-cpi
 go 1.25.0
 
 require (
-	github.com/cloudfoundry/bosh-cpi-go v0.0.0-20260321100143-e75056c7b58a
-	github.com/cloudfoundry/bosh-utils v0.0.604
+	github.com/cloudfoundry/bosh-cpi-go v0.0.0-20260328100241-7808cbeb4d7e
+	github.com/cloudfoundry/bosh-utils v0.0.605
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.6.0
@@ -39,10 +39,10 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.67.0 // indirect
-	go.opentelemetry.io/otel v1.42.0 // indirect
+	go.opentelemetry.io/otel v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.19.0 // indirect
-	go.opentelemetry.io/otel/metric v1.42.0 // indirect
-	go.opentelemetry.io/otel/trace v1.42.0 // indirect
+	go.opentelemetry.io/otel/metric v1.43.0 // indirect
+	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/mod v0.34.0 // indirect
 	golang.org/x/net v0.52.0 // indirect
