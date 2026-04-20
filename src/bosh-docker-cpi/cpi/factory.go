@@ -2,6 +2,7 @@ package cpi
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"net/http"
 
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
@@ -141,7 +142,7 @@ func (Factory) httpClient(opts config.DockerOpts) (*http.Client, error) {
 		return nil, nil
 	}
 
-	certPool, err := dkrtlsconfig.SystemCertPool()
+	certPool, err := x509.SystemCertPool()
 	if err != nil {
 		return nil, bosherr.WrapError(err, "Adding system CA certs")
 	}
