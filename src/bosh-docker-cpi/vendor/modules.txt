@@ -18,7 +18,7 @@ github.com/cespare/xxhash/v2
 ## explicit; go 1.25.0
 github.com/cloudfoundry/bosh-cpi-go/apiv1
 github.com/cloudfoundry/bosh-cpi-go/rpc
-# github.com/cloudfoundry/bosh-utils v0.0.607
+# github.com/cloudfoundry/bosh-utils v0.0.608
 ## explicit; go 1.25.0
 github.com/cloudfoundry/bosh-utils/errors
 github.com/cloudfoundry/bosh-utils/logger
