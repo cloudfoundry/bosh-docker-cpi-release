@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/cloudfoundry/bosh-cpi-go v0.0.0-20260509100147-8d096f87342c
-	github.com/cloudfoundry/bosh-utils v0.0.610
+	github.com/cloudfoundry/bosh-utils v0.0.611
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.7.0
