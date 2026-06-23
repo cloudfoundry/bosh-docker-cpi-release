@@ -162,10 +162,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		"/lib/modules:/usr/lib/modules", // make host kernel modules accessible
 	}
 
-	if startContainersWithSystemD {
-		// systemd needs read-write access to the cgroup filesystem to manage
-		// service cgroups. Without this mount, systemd may fail to initialize
-		// on cgroups v2 hosts.
+	if cgroupBind(startContainersWithSystemD, f.Config.MountCgroupfs) {
 		binds = append(binds, "/sys/fs/cgroup:/sys/fs/cgroup:rw")
 	}
 
@@ -270,6 +267,15 @@ func populateResolveConf(networks apiv1.Networks) string {
 	}
 
 	return fmt.Sprintf(`printf '%%s\n' %s > /etc/resolv.conf`, strings.Join(nameserverEntries, " "))
+}
+
+// cgroupBind reports whether the /sys/fs/cgroup bind mount should be added to the
+// container. On cgroup-v2 hosts the bind lets systemd manage service cgroups via
+// the host hierarchy. On cgroup-v1 hosts it must be omitted because the shared
+// host mount causes runc to encounter EBUSY when it tries to rmdir an empty
+// memory cgroup whose kernel accounting charges have not yet propagated.
+func cgroupBind(startContainersWithSystemD, mountCgroupfs bool) bool {
+	return startContainersWithSystemD && mountCgroupfs
 }
 
 func (f Factory) cleanMounts(vmProps Props) Props {
