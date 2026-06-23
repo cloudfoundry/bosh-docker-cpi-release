@@ -13,6 +13,7 @@ type Config struct {
 	Actions FactoryOpts
 
 	StartContainersWithSystemD bool              `json:"start_containers_with_systemd"`
+	MountCgroupfs              bool              `json:"mount_cgroupfs"`
 	EnableLXCFSSupport         bool              `json:"enable_lxcfs_support"`
 	LightStemcell              LightStemcellOpts `json:"light_stemcell"`
 }

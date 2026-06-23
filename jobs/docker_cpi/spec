@@ -41,6 +41,9 @@ properties:
   docker_cpi.start_containers_with_systemd:
     description: "Containers will use /sbin/init as the entry point. Enabling this is required for Noble stemcells."
     default: false
+  docker_cpi.mount_cgroupfs:
+    description: "Bind-mount the host /sys/fs/cgroup into systemd containers (required for cgroups v2; set false on cgroups v1 hosts to avoid the dying-cgroup runc delete failure). Only takes effect when start_containers_with_systemd is true."
+    default: true
   docker_cpi.enable_lxcfs_support:
     description: "Enable LXCFS support for containers"
     default: false
