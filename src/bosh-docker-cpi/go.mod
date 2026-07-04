@@ -4,11 +4,11 @@ go 1.25.0
 
 require (
 	github.com/cloudfoundry/bosh-cpi-go v0.0.0-20260627100039-749c789f7b48
-	github.com/cloudfoundry/bosh-utils v0.0.623
+	github.com/cloudfoundry/bosh-utils v0.0.624
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.7.0
-	github.com/onsi/ginkgo/v2 v2.31.0
+	github.com/onsi/ginkgo/v2 v2.32.0
 	github.com/onsi/gomega v1.40.0
 	github.com/opencontainers/image-spec v1.1.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -50,7 +50,7 @@ require (
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65 // indirect
-	golang.org/x/tools v0.46.0 // indirect
+	golang.org/x/tools v0.47.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241021214115-324edc3d5d38 // indirect
 	google.golang.org/grpc v1.67.1 // indirect
 	gotest.tools/v3 v3.1.0 // indirect
