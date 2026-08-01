@@ -10,10 +10,10 @@ github.com/cenkalti/backoff/v4 v4.2.1 h1:y4OZtCnogmCPw98Zjyt5a6+QwPLGkiQsYW5oUqy
 github.com/cenkalti/backoff/v4 v4.2.1/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
 github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
-github.com/cloudfoundry/bosh-cpi-go v0.0.0-20260718100127-890c302800d9 h1:CECHPVIhCE5rhYArmGrXRgO/MIqosbNLOPd95yLI0nM=
-github.com/cloudfoundry/bosh-cpi-go v0.0.0-20260718100127-890c302800d9/go.mod h1:d9v/Ga8LyN3zQf2Qd4dycVcxah+fwuKxIxj4Yld1OmU=
-github.com/cloudfoundry/bosh-utils v0.0.629 h1:6wubE+dKZ7Poo0OwEjXtidDY73rMBT/3mzNMyMaqSuY=
-github.com/cloudfoundry/bosh-utils v0.0.629/go.mod h1:Xn5ynPVGqJX/mKQSqcAYCVF6XlCEpcWu2rkC/kGxq+4=
+github.com/cloudfoundry/bosh-cpi-go v0.0.0-20260727051557-721a1d47bcc3 h1:I4kOLd2i+GhDcmul1Lz/D/jNoSpsDQkxD7soumXf8GQ=
+github.com/cloudfoundry/bosh-cpi-go v0.0.0-20260727051557-721a1d47bcc3/go.mod h1:ZpZfp7gtSZJEUE8GZCptMwPL5JAUBdmBhrl6NMjaWWc=
+github.com/cloudfoundry/bosh-utils v0.0.630 h1:4rI6FmbrHHRrIxf2451ggxP9AaGinfaLyRmkfSciJic=
+github.com/cloudfoundry/bosh-utils v0.0.630/go.mod h1:1/jbVG/VPXcTE8mlJ7QCTYqJBPFzxqv9ivSBTrE/0rM=
 github.com/containerd/errdefs v1.0.0 h1:tg5yIfIlQIrxYtu9ajqY42W3lpS19XqdxRQeEwYG8PI=
 github.com/containerd/errdefs v1.0.0/go.mod h1:+YBYIdtsnF4Iw6nWZhJcqGSg/dwvV7tyJ/kCkyJ2k+M=
 github.com/containerd/errdefs/pkg v0.3.0 h1:9IKJ06FvyNlexW690DXuQNx2KA2cUJXx151Xdx3ZPPE=
@@ -27,8 +27,8 @@ github.com/distribution/reference v0.6.0 h1:0IXCQ5g4/QMHHkarYzh5l+u8T3t73zM5Qvfr
 github.com/distribution/reference v0.6.0/go.mod h1:BbU0aIcezP1/5jX/8MP0YiH4SdvB5Y4f/wlDRiLyi3E=
 github.com/docker/docker v28.5.2+incompatible h1:DBX0Y0zAjZbSrm1uzOkdr1onVghKaftjlSWt4AFexzM=
 github.com/docker/docker v28.5.2+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
-github.com/docker/go-connections v0.7.0 h1:6SsRfJddP22WMrCkj19x9WKjEDTB+ahsdiGYf0mN39c=
-github.com/docker/go-connections v0.7.0/go.mod h1:no1qkHdjq7kLMGUXYAduOhYPSJxxvgWBh7ogVvptn3Q=
+github.com/docker/go-connections v0.8.1 h1:JibmG5hULs5qXSr/cp/w3Pw5fZuStt4MOHMUExb29/M=
+github.com/docker/go-connections v0.8.1/go.mod h1:no1qkHdjq7kLMGUXYAduOhYPSJxxvgWBh7ogVvptn3Q=
 github.com/docker/go-units v0.5.0 h1:69rxXcBk27SvSaaxTtLh/8llcHD8vYHT7WSdRZ/jvr4=
 github.com/docker/go-units v0.5.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
 github.com/felixge/httpsnoop v1.1.0 h1:3YtUj32ZZkqZtt3sZZsClsymw/QDuVfpNhoA31zeORc=
