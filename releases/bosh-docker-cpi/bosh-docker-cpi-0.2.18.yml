@@ -1,0 +1,33 @@
+name: bosh-docker-cpi
+version: 0.2.18
+commit_hash: 265b126
+uncommitted_changes: false
+jobs:
+- name: docker_cpi
+  version: 13a62b624c6a42d976ff751d47b4cbd0be05f818f120b75de880151e23e1936b
+  fingerprint: 13a62b624c6a42d976ff751d47b4cbd0be05f818f120b75de880151e23e1936b
+  sha1: sha256:c3a6990873951be9b2a7935eeef332f69b2cf86b019d89ff6d32c62085ec3d51
+  packages:
+  - docker_cpi
+packages:
+- name: docker_cpi
+  version: 76a4222f7695e9f71ba2b79fe0a150df1960a124a620b413909e3af4d2c08253
+  fingerprint: 76a4222f7695e9f71ba2b79fe0a150df1960a124a620b413909e3af4d2c08253
+  sha1: sha256:29e73c0ae8c916691eb83b8e163307b85a3cc53cd0e409b9acc5137b50c9766b
+  dependencies:
+  - golang-1-linux
+  - golang-1-darwin
+- name: golang-1-darwin
+  version: 0808cbcc3075d0e9bf5ddd8bf8319bcdeaf6876aa6247951e3e60d2c7344223b
+  fingerprint: 0808cbcc3075d0e9bf5ddd8bf8319bcdeaf6876aa6247951e3e60d2c7344223b
+  sha1: sha256:f2958ffe6e2ffe382f61458d838852bf7eca1b178d1b599b4c44bdc68713a9ac
+  dependencies: []
+- name: golang-1-linux
+  version: 28e372fe0b7c324848d2612bd8d2560e35df511423a5a0531e15161086d786c1
+  fingerprint: 28e372fe0b7c324848d2612bd8d2560e35df511423a5a0531e15161086d786c1
+  sha1: sha256:7d7318ab81798f56b5b9bc82c857ac809bdcd638575bea62915b591b1c36cd39
+  dependencies: []
+license:
+  version: b4d84875bb1ce23eb9d025af74283cc974fc0ee6254c398c50cc1f0b7819131e
+  fingerprint: b4d84875bb1ce23eb9d025af74283cc974fc0ee6254c398c50cc1f0b7819131e
+  sha1: sha256:e30d4300928f4c74227694f809d508b3c1f9a63806e18c9e5315b2380903cd2c
