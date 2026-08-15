@@ -14,11 +14,11 @@ github.com/bmatcuk/doublestar
 # github.com/cespare/xxhash/v2 v2.3.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
-# github.com/cloudfoundry/bosh-cpi-go v0.0.0-20260808100336-051f1f43d711
+# github.com/cloudfoundry/bosh-cpi-go v0.0.0-20260813213915-65aa933cd736
 ## explicit; go 1.25.0
 github.com/cloudfoundry/bosh-cpi-go/apiv1
 github.com/cloudfoundry/bosh-cpi-go/rpc
-# github.com/cloudfoundry/bosh-utils v0.0.635
+# github.com/cloudfoundry/bosh-utils v0.0.636
 ## explicit; go 1.25.0
 github.com/cloudfoundry/bosh-utils/errors
 github.com/cloudfoundry/bosh-utils/logger
