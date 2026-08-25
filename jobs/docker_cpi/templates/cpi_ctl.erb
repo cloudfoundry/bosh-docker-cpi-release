@@ -16,6 +16,16 @@ case $1 in
     fi
     <% end %>
 
+    # The CPI runs as vcap, so a unix socket must be world-writable for it to
+    # reach the Docker daemon.
+    docker_host='<%= p('docker_cpi.docker.host') %>'
+    if [[ "$docker_host" == unix://* ]]; then
+      docker_socket="${docker_host#unix://}"
+      if [ -S "$docker_socket" ]; then
+        chmod 777 "$docker_socket"
+      fi
+    fi
+
     echo 1 > $PIDFILE
     ;;
 

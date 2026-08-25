@@ -25,7 +25,6 @@ properties:
     description: |
       Mutual TLS client certificate for connecting to Docker daemon.
       Optional with unix:// host, otherwise required.
-
   docker_cpi.agent.mbus:
     description: "Mbus URL used by deployed BOSH agents"
     example: "nats://nats:nats-password@10.254.50.4:4222"
