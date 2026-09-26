@@ -4,11 +4,11 @@ go 1.26.0
 
 require (
 	github.com/cloudfoundry/bosh-cpi-go v0.0.0-20260917211438-10ca39352bd6
-	github.com/cloudfoundry/bosh-utils v0.0.653
+	github.com/cloudfoundry/bosh-utils v0.0.655
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.8.1
-	github.com/onsi/ginkgo/v2 v2.32.2
+	github.com/onsi/ginkgo/v2 v2.33.0
 	github.com/onsi/gomega v1.43.0
 	github.com/opencontainers/image-spec v1.1.1
 	gopkg.in/yaml.v3 v3.0.1
