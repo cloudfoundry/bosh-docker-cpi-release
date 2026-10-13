@@ -188,6 +188,7 @@ jobs:
         output_repo: bosh-docker-cpi-release
       params:
         SOURCE_PATH: src/bosh-docker-cpi
+        BUMP_TEST_DEPS: true
     - task: unit-tests
       file: bosh-docker-cpi-release-ci/ci/tasks/unit-tests.yml
       image: bosh-integration-image
