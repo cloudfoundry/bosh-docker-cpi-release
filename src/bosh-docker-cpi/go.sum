@@ -10,10 +10,10 @@ github.com/cenkalti/backoff/v4 v4.2.1 h1:y4OZtCnogmCPw98Zjyt5a6+QwPLGkiQsYW5oUqy
 github.com/cenkalti/backoff/v4 v4.2.1/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
 github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
-github.com/cloudfoundry/bosh-cpi-go v0.0.0-20261010100107-a6a9db7e04c7 h1:Una9nJPa0rCaMKm0A4Tv1k/MtUc4wqrZe2nueRuCQrA=
-github.com/cloudfoundry/bosh-cpi-go v0.0.0-20261010100107-a6a9db7e04c7/go.mod h1:/mm9TYfIJd1qSpeMDO3dnWZbWw2VoJw0gIRPwynfwpI=
-github.com/cloudfoundry/bosh-utils v0.0.659 h1:K8e5d1YjqfRpSaR0rdVA29Oon4vXnPb7h7Sru93mhjw=
-github.com/cloudfoundry/bosh-utils v0.0.659/go.mod h1:IN/Qq8Es/P8ZyfLg3eo4Opph7KQ7ONGKypnQGm9v/FE=
+github.com/cloudfoundry/bosh-cpi-go v0.0.0-20261017100100-5481e9266ff3 h1:Wcd4qiG2ulg+mroxddF7ma0UudNNqKCLIiJJI6/eaZI=
+github.com/cloudfoundry/bosh-cpi-go v0.0.0-20261017100100-5481e9266ff3/go.mod h1:bU+s7rGT17rg4MhRAQr3QMMi26aPTTgF9FQMxMah+Lk=
+github.com/cloudfoundry/bosh-utils v0.0.660 h1:V+9/u3r8Bao9vEctD9GduOfyXSip4/YRdVCEAnufaho=
+github.com/cloudfoundry/bosh-utils v0.0.660/go.mod h1:LUxQVMTTRCAvgChbJjkey3DqimhQqf8/zrSkbtr19Go=
 github.com/containerd/errdefs v1.0.0 h1:tg5yIfIlQIrxYtu9ajqY42W3lpS19XqdxRQeEwYG8PI=
 github.com/containerd/errdefs v1.0.0/go.mod h1:+YBYIdtsnF4Iw6nWZhJcqGSg/dwvV7tyJ/kCkyJ2k+M=
 github.com/containerd/errdefs/pkg v0.3.0 h1:9IKJ06FvyNlexW690DXuQNx2KA2cUJXx151Xdx3ZPPE=
@@ -51,8 +51,8 @@ github.com/google/go-cmp v0.4.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/
 github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
-github.com/google/pprof v0.0.0-20261012231050-2af12c3f4d87 h1:P18JvwDzBYAeC8SIfnee/YJzKk1dysuN6rUwmF6CxZY=
-github.com/google/pprof v0.0.0-20261012231050-2af12c3f4d87/go.mod h1:yUo1AMMpsPIDFGuwDK8nLcf8+vvAd5l2O6JDZ6hpwrM=
+github.com/google/pprof v0.0.0-20261016150608-1facf8f91b50 h1:PlNWJRxu5APSV0pWqfIsZ0qt9OOGHSWfZQ4zvx+WgWs=
+github.com/google/pprof v0.0.0-20261016150608-1facf8f91b50/go.mod h1:yUo1AMMpsPIDFGuwDK8nLcf8+vvAd5l2O6JDZ6hpwrM=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 h1:YBftPWNWd4WwGqtY2yeZL2ef8rHAxPBD8KFhJpmcqms=

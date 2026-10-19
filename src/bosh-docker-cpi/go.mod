@@ -3,8 +3,8 @@ module bosh-docker-cpi
 go 1.26.0
 
 require (
-	github.com/cloudfoundry/bosh-cpi-go v0.0.0-20261010100107-a6a9db7e04c7
-	github.com/cloudfoundry/bosh-utils v0.0.659
+	github.com/cloudfoundry/bosh-cpi-go v0.0.0-20261017100100-5481e9266ff3
+	github.com/cloudfoundry/bosh-utils v0.0.660
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.8.2
@@ -28,7 +28,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/pprof v0.0.0-20261012231050-2af12c3f4d87 // indirect
+	github.com/google/pprof v0.0.0-20261016150608-1facf8f91b50 // indirect
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.14.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/sys/atomicwriter v0.1.0 // indirect
