@@ -132,7 +132,7 @@ func (s *fileService) Download(sourcePath string) ([]byte, error) {
 	hdr, tarNextErr := tr.Next()
 	if tarNextErr != nil {
 		pr.CloseWithError(tarNextErr)
-		<-copyDone
+		<-copyDone //nolint:errcheck
 		// Poll until the exec process has actually exited so we can report the
 		// real exit status and stderr rather than a confusing tar parse error.
 		// A single inspect call is insufficient because the process may still
@@ -169,7 +169,7 @@ func (s *fileService) Download(sourcePath string) ([]byte, error) {
 	// invocation produced an unrelated entry.
 	if hdr.Typeflag != tar.TypeReg {
 		pr.CloseWithError(bosherr.Errorf("unexpected entry type"))
-		<-copyDone
+		<-copyDone //nolint:errcheck
 		return nil, bosherr.Errorf(
 			"tar entry for '%s' is not a regular file (type=%d)", cleanedBase, hdr.Typeflag)
 	}
@@ -177,7 +177,7 @@ func (s *fileService) Download(sourcePath string) ([]byte, error) {
 	// reliable comparison.
 	if path.Clean(hdr.Name) != cleanedBase {
 		pr.CloseWithError(bosherr.Errorf("unexpected entry name"))
-		<-copyDone
+		<-copyDone //nolint:errcheck
 		return nil, bosherr.Errorf(
 			"tar entry for '%s' has unexpected name '%s'", cleanedBase, hdr.Name)
 	}
@@ -187,7 +187,7 @@ func (s *fileService) Download(sourcePath string) ([]byte, error) {
 	// goroutine can complete its writes and exit cleanly. If the drain fails
 	// it means the copy goroutine itself failed; report that via copyDone.
 	if _, err = io.Copy(io.Discard, pr); err != nil {
-		<-copyDone
+		<-copyDone //nolint:errcheck
 		return nil, bosherr.WrapErrorf(err, "Draining tar stream from container for '%s'", sourcePath)
 	}
 
