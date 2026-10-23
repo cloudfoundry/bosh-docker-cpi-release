@@ -71,8 +71,12 @@ func TestHTTPClientUsesOnlyConfiguredCA(t *testing.T) {
 				t.Fatal("accepted unrelated server authority")
 			}
 			if response != nil {
-				io.Copy(io.Discard, response.Body)
-				response.Body.Close()
+				if _, err := io.Copy(io.Discard, response.Body); err != nil {
+					t.Fatal(err)
+				}
+				if err := response.Body.Close(); err != nil {
+					t.Fatal(err)
+				}
 			}
 		})
 	}

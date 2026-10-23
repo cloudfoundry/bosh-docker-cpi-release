@@ -6,6 +6,8 @@ import (
 	"io"
 	"strings"
 
+	digest "github.com/opencontainers/go-digest"
+
 	"github.com/cloudfoundry/bosh-cpi-go/apiv1"
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
@@ -108,13 +110,24 @@ func (i LightImporter) ImportFromPath(imagePath string) (Stemcell, error) {
 
 	i.logger.Debug(i.logTag, "Image pulled successfully")
 
+	// Inspect once: verification and the returned immutable image ID must refer
+	// to the same snapshot of daemon state even if another pull changes the tag.
+	inspect, err := i.dkrClient.ImageInspect(context.TODO(), imageReference)
+	if err != nil {
+		return nil, bosherr.WrapError(err, "Inspecting pulled image")
+	}
+	imageID, err := digest.Parse(inspect.ID)
+	if err != nil || imageID.Algorithm() != digest.SHA256 {
+		return nil, bosherr.Error("Pulled image has no valid SHA256 image ID")
+	}
+
 	// Verify image digest if required
 	if i.verifyDigest {
 		expectedDigest := metadata.GetDigest()
 		if expectedDigest == "" {
 			return nil, bosherr.Error("Image verification required but no digest provided in stemcell metadata")
 		}
-		err = i.verifyImageDigest(imageReference, expectedDigest)
+		err = i.verifyImageDigest(inspect, expectedDigest)
 		if err != nil {
 			return nil, bosherr.WrapError(err, "Verifying image digest")
 		}
@@ -122,14 +135,7 @@ func (i LightImporter) ImportFromPath(imagePath string) (Stemcell, error) {
 
 	i.logger.Debug(i.logTag, "Imported light stemcell from path '%s'", imagePath)
 
-	// Get the image digest to use as CID
-	// This provides content-addressable reference to the image
-	digestCID, err := i.getImageDigestCID(imageReference)
-	if err != nil {
-		return nil, bosherr.WrapError(err, "Getting image digest for CID")
-	}
-
-	return NewImage(apiv1.NewStemcellCID(digestCID), i.dkrClient, i.logger), nil
+	return NewImage(apiv1.NewStemcellCID(inspect.ID), i.dkrClient, i.logger), nil
 }
 
 // validateImageReference performs basic validation on the image reference
@@ -160,14 +166,7 @@ func (i LightImporter) validateImageReference(imageRef string) error {
 }
 
 // verifyImageDigest verifies the pulled image matches the expected SHA256 digest
-func (i LightImporter) verifyImageDigest(imageRef string, expectedDigest string) error {
-	i.logger.Debug(i.logTag, "Verifying digest for image '%s'", imageRef)
-
-	inspect, err := i.dkrClient.ImageInspect(context.TODO(), imageRef)
-	if err != nil {
-		return bosherr.WrapErrorf(err, "Inspecting image '%s'", imageRef)
-	}
-
+func (i LightImporter) verifyImageDigest(inspect dkrimages.InspectResponse, expectedDigest string) error {
 	// Docker image IDs are in the format sha256:hash
 	// We need to extract just the hash part
 	actualDigest := inspect.ID
@@ -206,33 +205,6 @@ func (i LightImporter) verifyImageDigest(imageRef string, expectedDigest string)
 
 	i.logger.Debug(i.logTag, "Image digest verified successfully")
 	return nil
-}
-
-// getImageDigestCID retrieves the image digest to use as the CID
-func (i LightImporter) getImageDigestCID(imageRef string) (string, error) {
-	inspect, err := i.dkrClient.ImageInspect(context.TODO(), imageRef)
-	if err != nil {
-		return "", bosherr.WrapErrorf(err, "Inspecting image '%s'", imageRef)
-	}
-
-	// Try to use RepoDigests first (content-addressable digest from registry)
-	// Format: registry/repo@sha256:digest
-	if len(inspect.RepoDigests) > 0 {
-		// Use the first RepoDigest as the CID
-		// This is the content-addressable reference from the registry
-		return inspect.RepoDigests[0], nil
-	}
-
-	// Fallback to image ID if RepoDigests is not available
-	// This happens when the image was built locally
-	// Format: sha256:digest, convert to image@sha256:digest format
-	if inspect.ID != "" {
-		// Extract just the digest part (after sha256:)
-		digest := strings.TrimPrefix(inspect.ID, "sha256:")
-		return imageRef + "@sha256:" + digest, nil
-	}
-
-	return "", bosherr.Error("Could not determine image digest for CID")
 }
 
 // dockerPullEvent represents a Docker pull progress event

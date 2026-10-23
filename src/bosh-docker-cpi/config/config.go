@@ -61,7 +61,12 @@ type DockerOptsTLS struct {
 }
 
 type LightStemcellOpts struct {
-	RequireImageVerification bool `json:"require_image_verification"`
+	RequireImageVerification *bool `json:"require_image_verification,omitempty"`
+}
+
+// ImageVerificationRequired defaults to verification unless explicitly disabled.
+func (o LightStemcellOpts) ImageVerificationRequired() bool {
+	return o.RequireImageVerification == nil || *o.RequireImageVerification
 }
 
 type FactoryOpts struct {

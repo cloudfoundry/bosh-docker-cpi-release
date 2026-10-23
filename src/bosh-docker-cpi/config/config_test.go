@@ -165,7 +165,7 @@ var _ = Describe("Config", func() {
 				Expect(cfg.StartContainersWithSystemD).To(BeTrue())
 				Expect(cfg.MountCgroupfs).To(BeTrue())
 				Expect(cfg.EnableLXCFSSupport).To(BeTrue())
-				Expect(cfg.LightStemcell.RequireImageVerification).To(BeTrue())
+				Expect(cfg.LightStemcell.ImageVerificationRequired()).To(BeTrue())
 				Expect(cfg.Actions.Docker.Host).To(Equal("unix:///var/run/docker.sock"))
 				Expect(cfg.Actions.Docker.APIVersion).To(Equal("1.24"))
 				Expect(cfg.Actions.Agent.Mbus).To(Equal("https://user:pass@127.0.0.1:4321/agent"))

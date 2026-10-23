@@ -68,12 +68,12 @@ properties:
 
 ### CID Behavior
 
-Light stemcells use the Docker image digest as the Cloud ID (CID), providing content-addressable and immutable references:
+Light stemcells use the local Docker image ID (`sha256:<id>`) of the pulled and verified image as the Cloud ID (CID), providing content-addressable and immutable references:
 
 ```bash
 $ bosh stemcells
 NAME                      VERSION  OS            CID
-bosh-docker-ubuntu-noble  1.165    ubuntu-noble  ghcr.io/cloudfoundry/ubuntu-noble-stemcell@sha256:d4ca21a75f1ff6be382695e299257f054585143bf09762647bcb32f37be5eaf3
+bosh-docker-ubuntu-noble  1.165    ubuntu-noble  sha256:<image ID>
 ```
 
 This provides immutability guarantees, ensuring the stemcell always references the exact image content. This differs from traditional stemcells which use generated UUIDs.

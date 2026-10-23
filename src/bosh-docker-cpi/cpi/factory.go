@@ -86,7 +86,7 @@ func (f Factory) New(ctx apiv1.CallContext) (apiv1.CPI, error) {
 		dkrClient,
 		f.fs,
 		f.uuidGen,
-		f.Config.LightStemcell.RequireImageVerification,
+		f.Config.LightStemcell.ImageVerificationRequired(),
 		f.logger,
 	)
 	stemcellFinder := bstem.NewFSFinder(dkrClient, f.logger)
