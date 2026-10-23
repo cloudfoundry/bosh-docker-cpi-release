@@ -1,5 +1,5 @@
 # Stage 1: Build the CPI binary
-FROM golang:1.25 AS builder
+FROM golang:1.25@sha256:699337d620559a59b4a2bb298ad59611e535d2ee755a34cf2d2a98f37578dc80 AS builder
 
 # Add build arg to force rebuild
 ARG CACHE_BUST=unknown
@@ -15,7 +15,7 @@ RUN echo "Building at: $(date)" && echo "Cache bust: $CACHE_BUST"
 RUN CGO_ENABLED=0 GOOS=linux go build -o /cpi ./main
 
 # Stage 2: Create custom instant-bosh image
-FROM ghcr.io/rkoster/instant-bosh:main
+FROM ghcr.io/rkoster/instant-bosh:main@sha256:369a5250348f9a9b0882e284b8d29cdfa234940a5672f20bc00c6b692d792222
 
 # First, remove the existing CPI binary to ensure we're not using cached layers
 RUN rm -f /var/vcap/packages/docker_cpi/bin/cpi-linux
