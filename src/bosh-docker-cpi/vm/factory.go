@@ -3,6 +3,7 @@ package vm
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 
 	"bosh-docker-cpi/config"
@@ -68,6 +69,14 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		startContainersWithSystemD = false
 	}
 
+	var resolvConfCommand string
+	if !startContainersWithSystemD {
+		resolvConfCommand, err = populateResolveConf(networks)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	lxcfsEnabled := f.Config.EnableLXCFSSupport
 	if vmProps.ForceLXCFSEnabled {
 		lxcfsEnabled = true
@@ -123,7 +132,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 
 		startContainerCommands = append(preStartCommands, `exec /sbin/init`)
 	} else {
-		preStartCommands = append(preStartCommands, []string{populateResolveConf(networks)}...)
+		preStartCommands = append(preStartCommands, []string{resolvConfCommand}...)
 
 		startContainerCommands = append(preStartCommands, `exec env -i /usr/sbin/runsvdir-start`)
 	}
@@ -254,19 +263,23 @@ func (f Factory) possiblyFindNodeWithDisk(diskID apiv1.DiskCID) (string, error) 
 	return "", nil
 }
 
-func populateResolveConf(networks apiv1.Networks) string {
+func populateResolveConf(networks apiv1.Networks) (string, error) {
 	var nameserverEntries []string
 	for _, network := range networks {
 		for _, dnsServer := range network.DNS() {
-			nameserverEntries = append(nameserverEntries, fmt.Sprintf(`"nameserver %s"`, dnsServer))
+			ip := net.ParseIP(dnsServer)
+			if ip == nil {
+				return "", bosherr.Error("DNS server must be an IP address")
+			}
+			nameserverEntries = append(nameserverEntries, fmt.Sprintf("'nameserver %s'", ip.String()))
 		}
 	}
 
 	if len(nameserverEntries) == 0 {
-		return ":" // no-op bash command
+		return ":", nil // no-op bash command
 	}
 
-	return fmt.Sprintf(`printf '%%s\n' %s > /etc/resolv.conf`, strings.Join(nameserverEntries, " "))
+	return fmt.Sprintf(`printf '%%s\n' %s > /etc/resolv.conf`, strings.Join(nameserverEntries, " ")), nil
 }
 
 // cgroupBind reports whether the /sys/fs/cgroup bind mount should be added to the
