@@ -182,7 +182,14 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	}
 
 	if lxcfsEnabled {
-		binds = append(binds, "/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw")
+		binds = append(binds,
+			// /proc/uptime is excluded on purpose: LXCFS makes it container-relative
+			// while /proc/<pid>/stat's starttime stays host-relative, so uptime minus
+			// starttime goes negative for every process.
+			"/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw",
+			"/var/lib/lxcfs/proc/cpuinfo:/proc/cpuinfo:rw",
+			"/var/lib/lxcfs/proc/stat:/proc/stat:rw",
+		)
 	}
 
 	vmProps.HostConfig.Binds = binds //nolint:staticcheck
