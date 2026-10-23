@@ -142,13 +142,10 @@ func (Factory) httpClient(opts config.DockerOpts) (*http.Client, error) {
 		return nil, nil
 	}
 
-	certPool, err := x509.SystemCertPool()
-	if err != nil {
-		return nil, bosherr.WrapError(err, "Adding system CA certs")
-	}
+	certPool := x509.NewCertPool()
 
 	if !certPool.AppendCertsFromPEM([]byte(opts.TLS.CA)) {
-		return nil, bosherr.WrapError(err, "Appending configured CA certs")
+		return nil, bosherr.Error("Appending configured CA certs: no valid CA certificate found")
 	}
 
 	tlsConfig := dkrtlsconfig.ClientDefault()
