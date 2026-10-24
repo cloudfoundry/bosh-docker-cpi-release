@@ -16,11 +16,11 @@ github.com/bmatcuk/doublestar
 # github.com/cespare/xxhash/v2 v2.3.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
-# github.com/cloudfoundry/bosh-cpi-go v0.0.0-20261017100100-5481e9266ff3
+# github.com/cloudfoundry/bosh-cpi-go v0.0.0-20261021181541-5f9dc37e5d64
 ## explicit; go 1.26.0
 github.com/cloudfoundry/bosh-cpi-go/apiv1
 github.com/cloudfoundry/bosh-cpi-go/rpc
-# github.com/cloudfoundry/bosh-utils v0.0.663
+# github.com/cloudfoundry/bosh-utils v0.0.667
 ## explicit; go 1.26.0
 github.com/cloudfoundry/bosh-utils/errors
 github.com/cloudfoundry/bosh-utils/logger
@@ -74,7 +74,7 @@ github.com/docker/go-units
 # github.com/felixge/httpsnoop v1.1.0
 ## explicit; go 1.25
 github.com/felixge/httpsnoop
-# github.com/gkampitakis/go-snaps v0.5.23
+# github.com/gkampitakis/go-snaps v0.5.24
 ## explicit; go 1.23
 # github.com/go-logr/logr v1.4.4
 ## explicit; go 1.18
@@ -165,14 +165,6 @@ github.com/opencontainers/image-spec/specs-go/v1
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
-# github.com/rogpeppe/go-internal v1.16.0
-## explicit; go 1.25
-# github.com/tidwall/gjson v1.20.0
-## explicit; go 1.23
-# github.com/tidwall/match v1.2.0
-## explicit; go 1.15
-# github.com/tidwall/pretty v1.2.2
-## explicit; go 1.16
 # go.opentelemetry.io/auto/sdk v1.2.1
 ## explicit; go 1.24.0
 go.opentelemetry.io/auto/sdk
@@ -293,8 +285,6 @@ golang.org/x/tools/internal/versions
 ## explicit; go 1.26.0
 # google.golang.org/genproto/googleapis/rpc v0.0.0-20261019180522-ce908d29299b
 ## explicit; go 1.26.0
-# google.golang.org/protobuf v1.36.12
-## explicit; go 1.23
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
