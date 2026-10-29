@@ -152,6 +152,7 @@ var _ = Describe("Config", func() {
 					},
 					"start_containers_with_systemd": true,
 					"mount_cgroupfs": true,
+					"use_host_cgroup_namespace": true,
 					"enable_lxcfs_support": true,
 					"light_stemcell": {
 						"require_image_verification": true
@@ -164,6 +165,7 @@ var _ = Describe("Config", func() {
 
 				Expect(cfg.StartContainersWithSystemD).To(BeTrue())
 				Expect(cfg.MountCgroupfs).To(BeTrue())
+				Expect(cfg.UseHostCgroupNamespace).To(BeTrue())
 				Expect(cfg.EnableLXCFSSupport).To(BeTrue())
 				Expect(cfg.LightStemcell.RequireImageVerification).To(BeTrue())
 				Expect(cfg.Actions.Docker.Host).To(Equal("unix:///var/run/docker.sock"))
@@ -178,6 +180,15 @@ var _ = Describe("Config", func() {
 				err := json.Unmarshal([]byte(data), &cfg)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(cfg.MountCgroupfs).To(BeFalse())
+			})
+
+			It("unmarshals use_host_cgroup_namespace as false when set to false", func() {
+				data := `{"use_host_cgroup_namespace": false}`
+
+				var cfg config.Config
+				err := json.Unmarshal([]byte(data), &cfg)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cfg.UseHostCgroupNamespace).To(BeFalse())
 			})
 
 			It("unmarshals TLS private_key json tag correctly", func() {
