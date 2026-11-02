@@ -250,7 +250,7 @@ resources:
         - ci
       uri: git@github.com:cloudfoundry/bosh-docker-cpi-release.git
       private_key: ((github_deploy_key_bosh-docker-cpi-release.private_key))
-      branch: master
+      branch: main
 
   - name: bosh-docker-cpi-release-ci
     type: git
