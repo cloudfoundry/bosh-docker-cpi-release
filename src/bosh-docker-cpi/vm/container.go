@@ -259,7 +259,12 @@ func (c Container) restartByRecreating(diskID apiv1.DiskCID, diskPath string) er
 	if len(node) > 0 {
 		// Hard schedule on the same node that has the disk
 		// todo hopefully swarm handles this functionality in future?
-		conf.Config.Env = []string{"constraint:node==" + node}
+		env := []string{"constraint:node==" + node}
+		// Only cgroup_v2 containers carry the label; legacy containers keep the old replacement.
+		if conf.Config.Labels[cgroupV2Label] == "true" {
+			env = append(env, cgroupV2Env)
+		}
+		conf.Config.Env = env
 	}
 
 	conf.HostConfig.Binds = c.updateBinds(conf.HostConfig.Binds, diskID, diskPath)
@@ -287,6 +292,13 @@ func (c Container) restartByRecreating(diskID apiv1.DiskCID, diskPath string) er
 	if err != nil {
 		c.Delete() //nolint:errcheck
 		return bosherr.WrapError(err, "Starting container")
+	}
+
+	if conf.Config.Labels[cgroupV2Label] == "true" {
+		if err := cgroupPreflightFailure(c.dkrClient, c.logger, "vm.Container", c.id); err != nil {
+			c.Delete() //nolint:errcheck
+			return err
+		}
 	}
 
 	return nil

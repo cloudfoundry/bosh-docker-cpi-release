@@ -78,6 +78,54 @@ bosh-docker-ubuntu-noble  1.165    ubuntu-noble  ghcr.io/cloudfoundry/ubuntu-nob
 
 This provides immutability guarantees, ensuring the stemcell always references the exact image content. This differs from traditional stemcells which use generated UUIDs.
 
+## Private cgroup v2 namespace for systemd containers
+
+By default, systemd containers share the host cgroup namespace (`CgroupnsMode: host`) and, unless
+`docker_cpi.mount_cgroupfs` is `false`, bind-mount the host `/sys/fs/cgroup`. With `cgroup_v2` enabled
+a systemd container on a cgroup v2 host instead gets a private, writable cgroup v2 namespace and no host cgroup bind.
+On a host Docker identifies as cgroup v1, it falls back to the legacy namespace and binding settings.
+
+Enable it for every systemd VM with the job property, and/or per VM in cloud-config:
+
+```yaml
+# deployment manifest (CPI default, applies to systemd VMs only)
+properties:
+  docker_cpi:
+    start_containers_with_systemd: true
+    cgroup_v2: true
+```
+
+```yaml
+# cloud-config vm_types (overrides the CPI default; false opts out)
+vm_types:
+- name: default
+  cloud_properties:
+    cgroup_v2: true
+```
+
+Requirements, all checked before the container is created unless noted:
+
+- systemd containers (`start_containers_with_systemd` or `force_start_with_systemd`); an explicit
+  per-VM `cgroup_v2: true` without systemd is an error, while the CPI-wide default silently skips runit VMs
+- the CPI's Docker API version (`docker_cpi.docker.api_version`) must be >= 1.41 for host detection and the
+  daemon must support it
+- Docker must report cgroup version `1` or `2`; v1 selects the legacy path, while an unknown or
+  missing version is an error
+- `CgroupnsMode` unset or `private`; no `VolumesFrom`; no `Mounts` or `Tmpfs` that touch `/sys/fs/cgroup`
+  (or a parent such as `/sys`). These are validated even if the host turns out to be v1, so a config
+  accepted on a v1 host is not rejected after a move to v2. `cloud_properties` `Binds` are ignored
+  (the CPI sets the container's binds itself) and a warning is logged
+- memory controller delegation and a writable cgroup mount, checked by a preflight inside the container; if it
+  fails, VM creation fails with a `cgroup_v2 preflight failed: <check>` error naming the failed check, and
+  the container and its ephemeral volume are removed. The CPI also logs a warning when `cgroup_v2` falls back on a v1 host
+
+`docker_cpi.mount_cgroupfs` is ignored when private v2 is selected. On v1 fallback it still controls
+the legacy host bind; set it to `false` to omit that bind. Setting it to `false` alone does not
+select a private cgroup namespace: legacy systemd containers still use `CgroupnsMode: host`.
+Host detection/API failures and v2 preflight failures are errors, not reasons to fall back.
+Existing VMs are unaffected until
+recreated; disk attach/detach recreates a container with the settings it already has.
+
 ## Development
 
 - integration tests: `cd tests && ./run.sh`

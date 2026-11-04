@@ -34,7 +34,9 @@ COPY jobs/docker_cpi/templates/cpi_ctl.erb /var/vcap/jobs/docker_cpi/templates/
 RUN mkdir -p /var/vcap/jobs/docker_cpi/config && \
     mkdir -p /var/vcap/jobs/docker_cpi/packages
 
-# Patch job.MF to add light_stemcell properties
+# Patch job.MF to add the light_stemcell and cgroup_v2 properties. cgroup_v2 defaults to
+# true here only so the dev image exercises the private cgroup namespace (it falls back
+# to the legacy namespace on cgroup v1 hosts); the job spec default stays false.
 RUN awk '/docker_cpi\.start_containers_with_systemd:/ { \
       print; \
       getline; print; \
@@ -42,16 +44,20 @@ RUN awk '/docker_cpi\.start_containers_with_systemd:/ { \
       print "  docker_cpi.light_stemcell.require_image_verification:"; \
       print "    description: \"Require SHA256 verification when pulling Docker images for light stemcells\""; \
       print "    default: true"; \
+      print "  docker_cpi.cgroup_v2:"; \
+      print "    description: \"Prefer a private cgroup v2 namespace for systemd containers\""; \
+      print "    default: true"; \
       next \
     } 1' /var/vcap/jobs/docker_cpi/job.MF > /tmp/job.MF && \
     mv /tmp/job.MF /var/vcap/jobs/docker_cpi/job.MF
 
-# Patch .bosh-job-metadata.json to add light_stemcell properties
+# Patch .bosh-job-metadata.json to add the light_stemcell and cgroup_v2 properties
 RUN python3 -c "import json; \
     f = open('/var/vcap/jobs/docker_cpi/.bosh-job-metadata.json', 'r'); \
     data = json.load(f); \
     f.close(); \
     data['properties']['docker_cpi.light_stemcell.require_image_verification'] = {'description': 'Require SHA256 verification when pulling Docker images for light stemcells', 'default': True}; \
+    data['properties']['docker_cpi.cgroup_v2'] = {'description': 'Prefer a private cgroup v2 namespace for systemd containers', 'default': True}; \
     f = open('/var/vcap/jobs/docker_cpi/.bosh-job-metadata.json', 'w'); \
     json.dump(data, f, indent=2); \
     f.close()"
