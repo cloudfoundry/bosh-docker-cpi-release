@@ -15,6 +15,7 @@ type Config struct {
 	StartContainersWithSystemD bool              `json:"start_containers_with_systemd"`
 	MountCgroupfs              bool              `json:"mount_cgroupfs"`
 	EnableLXCFSSupport         bool              `json:"enable_lxcfs_support"`
+	CgroupV2                   bool              `json:"cgroup_v2"`
 	LightStemcell              LightStemcellOpts `json:"light_stemcell"`
 }
 

@@ -12,6 +12,7 @@ import (
 	bosherr "github.com/cloudfoundry/bosh-utils/errors"
 	boshlog "github.com/cloudfoundry/bosh-utils/logger"
 	boshuuid "github.com/cloudfoundry/bosh-utils/uuid"
+	cerrdefs "github.com/containerd/errdefs"
 	dkrcont "github.com/docker/docker/api/types/container"
 	dkrstrslice "github.com/docker/docker/api/types/strslice"
 	"github.com/docker/docker/api/types/volume"
@@ -68,6 +69,29 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		startContainersWithSystemD = false
 	}
 
+	vmProps = f.cleanMounts(vmProps)
+
+	cgroupV2 := cgroupV2Enabled(f.Config, vmProps, startContainersWithSystemD)
+	if f.Config.CgroupV2 && vmProps.CgroupV2 == nil && !startContainersWithSystemD {
+		f.logger.Info(f.logTag, "Ignoring docker_cpi.cgroup_v2 for a VM that does not start with systemd")
+	}
+	if err := validateCgroupV2(vmProps, cgroupV2, startContainersWithSystemD); err != nil {
+		return nil, err
+	}
+	if cgroupV2 {
+		cgroupV2, err = f.checkCgroupV2Host(context.TODO())
+		if err != nil {
+			return nil, err
+		}
+		if !cgroupV2 {
+			f.logger.Warn(f.logTag, "cgroup_v2 was requested but the Docker host uses cgroup v1; "+
+				"falling back to the legacy host cgroup namespace and mount_cgroupfs setting")
+		}
+	}
+	if len(vmProps.Binds) > 0 { //nolint:staticcheck
+		f.logger.Warn(f.logTag, "Ignoring cloud_properties Binds %v; the CPI sets the container's binds itself", vmProps.Binds) //nolint:staticcheck
+	}
+
 	lxcfsEnabled := f.Config.EnableLXCFSSupport
 	if vmProps.ForceLXCFSEnabled {
 		lxcfsEnabled = true
@@ -94,6 +118,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		Image:        stemcell.ID().AsString(),
 		ExposedPorts: map[dkrnat.Port]struct{}{}, // todo what ports?
 		Env:          []string{"reschedule:on-node-failure"},
+		Labels:       map[string]string{cgroupV2Label: "false"},
 	}
 
 	// Umount Docker's bind-mounted /etc/resolv.conf, /etc/hosts, and /etc/hostname
@@ -110,6 +135,12 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		`mkdir -p /var/vcap/data/sys`,
 		`mkdir -p /var/vcap/store`,
 		"sed -i 's/chronyc/# chronyc/g' /var/vcap/bosh/bin/sync-time",
+	}
+
+	if cgroupV2 {
+		preStartCommands = append([]string{cgroupV2Preflight}, preStartCommands...)
+		containerConfig.Env = append(containerConfig.Env, cgroupV2Env)
+		containerConfig.Labels = map[string]string{cgroupV2Label: "true"}
 	}
 
 	var startContainerCommands []string
@@ -147,22 +178,24 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	vmProps.HostConfig.PublishAllPorts = true //nolint:staticcheck
 
 	if startContainersWithSystemD {
-		// systemd requires access to the host cgroup hierarchy, especially with cgroups v2.
+		// Preserve the legacy systemd layout unless cgroup_v2 is requested.
 		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModeHost //nolint:staticcheck
+	}
+
+	if cgroupV2 {
+		vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModePrivate //nolint:staticcheck
 	}
 
 	for _, port := range vmProps.ExposedPorts {
 		containerConfig.ExposedPorts[dkrnat.Port(port)] = struct{}{}
 	}
 
-	vmProps = f.cleanMounts(vmProps)
-
 	binds := []string{
 		fmt.Sprintf("%s:/var/vcap/data/", EphemeralDiskCID{id}.AsString()),
 		"/lib/modules:/usr/lib/modules", // make host kernel modules accessible
 	}
 
-	if cgroupBind(startContainersWithSystemD, f.Config.MountCgroupfs) {
+	if !cgroupV2 && cgroupBind(startContainersWithSystemD, f.Config.MountCgroupfs) {
 		binds = append(binds, "/sys/fs/cgroup:/sys/fs/cgroup:rw")
 	}
 
@@ -208,6 +241,20 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	agentEnvService := NewFSAgentEnvService(fileService, f.logger)
 
 	err = agentEnvService.Update(agentEnv)
+
+	// The preflight runs inside the container, so its failure only shows up as an
+	// exited container; surface its message instead of a generic upload error.
+	if cgroupV2 {
+		if preflightErr := cgroupPreflightFailure(f.dkrClient, f.logger, f.logTag, id); preflightErr != nil {
+			if err != nil {
+				f.logger.Warn(f.logTag, "Also failed updating container's agent env: %s", err)
+			}
+			f.cleanUpContainer(container)
+			f.removeEphemeralVolume(id)
+			return Container{}, preflightErr
+		}
+	}
+
 	if err != nil {
 		f.cleanUpContainer(container)
 		return Container{}, bosherr.WrapError(err, "Updating container's agent env")
@@ -229,6 +276,13 @@ func (f Factory) cleanUpContainer(container dkrcont.CreateResponse) {
 	err := f.dkrClient.ContainerRemove(context.TODO(), container.ID, rmOpts)
 	if err != nil {
 		f.logger.Error(f.logTag, "Failed destroying container '%s': %s", container.ID, err.Error())
+	}
+}
+
+func (f Factory) removeEphemeralVolume(id apiv1.VMCID) {
+	err := f.dkrClient.VolumeRemove(context.TODO(), EphemeralDiskCID{id}.AsString(), true)
+	if err != nil && !cerrdefs.IsNotFound(err) {
+		f.logger.Error(f.logTag, "Failed removing ephemeral volume of '%s': %s", id.AsString(), err.Error())
 	}
 }
 
@@ -270,8 +324,8 @@ func populateResolveConf(networks apiv1.Networks) string {
 }
 
 // cgroupBind reports whether the /sys/fs/cgroup bind mount should be added to the
-// container. On cgroup-v2 hosts the bind lets systemd manage service cgroups via
-// the host hierarchy. On cgroup-v1 hosts it must be omitted because the shared
+// legacy container. Isolated cgroup_v2 nodes must never use this bind.
+// On cgroup-v1 hosts it must be omitted because the shared
 // host mount causes runc to encounter EBUSY when it tries to rmdir an empty
 // memory cgroup whose kernel accounting charges have not yet propagated.
 func cgroupBind(startContainersWithSystemD, mountCgroupfs bool) bool {

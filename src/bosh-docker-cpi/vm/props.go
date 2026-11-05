@@ -13,6 +13,9 @@ type Props struct {
 	dkrcont.HostConfig `json:",inline"`
 	specs.Platform
 
+	// CgroupV2 overrides the CPI-wide cgroup_v2 default for this VM; nil keeps the default.
+	CgroupV2 *bool `json:"cgroup_v2"`
+
 	ForceStartWithSystemD    bool `json:"force_start_with_systemd"`
 	ForceStartWithoutSystemD bool `json:"force_start_without_systemd"`
 	ForceLXCFSEnabled        bool `json:"force_lxcfs_enabled"`
