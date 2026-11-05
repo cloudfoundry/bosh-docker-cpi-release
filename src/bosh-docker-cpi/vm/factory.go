@@ -118,6 +118,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		Image:        stemcell.ID().AsString(),
 		ExposedPorts: map[dkrnat.Port]struct{}{}, // todo what ports?
 		Env:          []string{"reschedule:on-node-failure"},
+		Labels:       map[string]string{cgroupV2Label: "false"},
 	}
 
 	// Umount Docker's bind-mounted /etc/resolv.conf, /etc/hosts, and /etc/hostname

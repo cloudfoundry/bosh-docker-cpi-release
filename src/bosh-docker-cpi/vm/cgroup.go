@@ -21,8 +21,8 @@ import (
 const cgroupV2Env = "container=docker"
 
 // cgroupV2Label marks containers created with a private cgroup namespace so that
-// recreating them (disk attach/detach) keeps the cgroup_v2 behaviour. Unlike the
-// environment, it cannot be inherited from the image.
+// recreating them (disk attach/detach) keeps the cgroup_v2 behaviour. Creation
+// explicitly sets it to true or false to override any inherited image label.
 const cgroupV2Label = "bosh-docker-cpi.cgroup_v2"
 
 // cgroupV2PreflightMessage prefixes every preflight failure; it is also how a
@@ -46,6 +46,8 @@ const cgroupV2Preflight = `(fail() { echo "` + cgroupV2PreflightMessage + `: $1"
 // before concluding its preflight passed. The preflight is the first command,
 // so a failure exits within milliseconds.
 var cgroupPreflightGrace = 300 * time.Millisecond
+
+const cgroupPreflightLogsTimeout = 5 * time.Second
 
 func validateCgroupV2(props Props, enabled, systemd bool) error {
 	if !enabled {
@@ -144,12 +146,13 @@ func cgroupPreflightFailure(dkrClient *dkrclient.Client, logger boshlog.Logger, 
 		if ctx.Err() != nil {
 			return nil
 		}
-		logger.Warn(logTag, "Could not check whether container '%s' passed the cgroup_v2 preflight: %s", id.AsString(), err)
-		return nil
+		return bosherr.WrapErrorf(err, "Checking cgroup_v2 preflight for container '%s'", id.AsString())
 	}
 
 	output := "output unavailable"
-	logs, err := dkrClient.ContainerLogs(context.TODO(), id.AsString(), dkrcont.LogsOptions{ShowStdout: true, ShowStderr: true})
+	logsCtx, cancelLogs := context.WithTimeout(context.Background(), cgroupPreflightLogsTimeout)
+	defer cancelLogs()
+	logs, err := dkrClient.ContainerLogs(logsCtx, id.AsString(), dkrcont.LogsOptions{ShowStdout: true, ShowStderr: true})
 	if err != nil {
 		logger.Warn(logTag, "Could not read logs of exited container '%s': %s", id.AsString(), err)
 	} else {

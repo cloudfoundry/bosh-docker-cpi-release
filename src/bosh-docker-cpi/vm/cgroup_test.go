@@ -134,9 +134,9 @@ var _ = Describe("cgroup_v2", func() {
 				Expect(strings.Contains(strings.Join(created.Env, " "), "container=docker")).To(Equal(c.private))
 				Expect(created.Labels[cgroupV2Label] == "true").To(Equal(c.private))
 				if !c.private {
-					// legacy VMs must be created exactly as before
+					// Override image labels so legacy VMs cannot select the private path.
 					Expect(created.Env).To(Equal([]string{"reschedule:on-node-failure"}))
-					Expect(created.Labels).To(BeEmpty())
+					Expect(created.Labels).To(HaveKeyWithValue(cgroupV2Label, "false"))
 					Expect(command).ToNot(ContainSubstring("cgroup"))
 				}
 				if c.systemd {
@@ -361,6 +361,41 @@ var _ = Describe("cgroup_v2", func() {
 				return nil, r.Context().Err()
 			}, client.WithVersion("1.44"))
 			Expect(cgroupPreflightFailure(cli, logger, "test", apiv1.NewVMCID("node"))).To(Succeed())
+		})
+
+		It("returns wait errors and cleans up the container and volume", func() {
+			var removed []string
+			transport := failingStart(nil, &removed)
+			err := create(func(r *http.Request) (*http.Response, error) {
+				if strings.HasSuffix(r.URL.Path, "/wait") {
+					return cgroupResponse(500, `{"message":"wait failed"}`), nil
+				}
+				return transport(r)
+			})
+			Expect(err).To(MatchError(ContainSubstring("Checking cgroup_v2 preflight for container 'c-")))
+			Expect(err).To(MatchError(ContainSubstring("wait failed")))
+			Expect(removed).To(HaveLen(2))
+			Expect(removed[0]).To(ContainSubstring("/containers/"))
+			Expect(removed[1]).To(ContainSubstring("/volumes/vol-eph-c-"))
+		})
+
+		It("bounds log retrieval with a separate context and cancels it afterward", func() {
+			var logsCtx context.Context
+			cli := cgroupClient(func(r *http.Request) (*http.Response, error) {
+				if strings.HasSuffix(r.URL.Path, "/wait") {
+					return cgroupResponse(200, `{"StatusCode":1}`), nil
+				}
+				Expect(r.URL.Path).To(HaveSuffix("/logs"))
+				logsCtx = r.Context()
+				deadline, ok := logsCtx.Deadline()
+				Expect(ok).To(BeTrue())
+				Expect(time.Until(deadline)).To(BeNumerically(">", cgroupPreflightGrace))
+				Expect(time.Until(deadline)).To(BeNumerically("<=", cgroupPreflightLogsTimeout))
+				return cgroupResponse(200, cgroupV2PreflightMessage+": memory.max is missing"), nil
+			}, client.WithVersion("1.44"))
+			err := cgroupPreflightFailure(cli, logger, "test", apiv1.NewVMCID("node"))
+			Expect(err).To(MatchError(ContainSubstring(cgroupV2PreflightMessage + ": memory.max is missing")))
+			Expect(logsCtx.Err()).To(MatchError(context.Canceled))
 		})
 	})
 
