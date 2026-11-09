@@ -153,17 +153,8 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 	vmProps.HostConfig.Privileged = true      //nolint:staticcheck
 	vmProps.HostConfig.PublishAllPorts = true //nolint:staticcheck
 
-	if startContainersWithSystemD {
-		if f.Config.UseHostCgroupNamespace {
-			// systemd requires access to the host cgroup hierarchy, especially with cgroups v2.
-			vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModeHost //nolint:staticcheck
-		} else {
-			// Set this explicitly rather than leaving it empty: the container is
-			// privileged, and for an empty CgroupnsMode the daemon falls back to the
-			// host namespace on cgroup v1 hosts and to its own configured default
-			// otherwise, so an empty value would not reliably give a private one.
-			vmProps.HostConfig.CgroupnsMode = dkrcont.CgroupnsModePrivate //nolint:staticcheck
-		}
+	if mode := cgroupnsMode(startContainersWithSystemD, f.Config.UseHostCgroupNamespace); mode != "" {
+		vmProps.HostConfig.CgroupnsMode = mode //nolint:staticcheck
 	}
 
 	for _, port := range vmProps.ExposedPorts {
@@ -296,6 +287,25 @@ func populateResolveConf(networks apiv1.Networks) string {
 // the host hierarchy. On cgroup-v1 hosts it must be omitted because the shared
 // host mount causes runc to encounter EBUSY when it tries to rmdir an empty
 // memory cgroup whose kernel accounting charges have not yet propagated.
+// cgroupnsMode returns the cgroup namespace to create the container with, or an
+// empty mode to leave the caller's value alone when systemd is not in use.
+//
+// The private case is named explicitly rather than left empty: these containers
+// are privileged, and for an empty mode the daemon falls back to the host
+// namespace on cgroup v1 hosts and to its own configured default otherwise, so
+// an empty value would not reliably give a private one.
+func cgroupnsMode(startContainersWithSystemD, useHostCgroupNamespace bool) dkrcont.CgroupnsMode {
+	switch {
+	case !startContainersWithSystemD:
+		return ""
+	case useHostCgroupNamespace:
+		// systemd requires access to the host cgroup hierarchy, especially with cgroups v2.
+		return dkrcont.CgroupnsModeHost
+	default:
+		return dkrcont.CgroupnsModePrivate
+	}
+}
+
 // cgroupNamespaceConflict reports whether the requested combination asks for a
 // private cgroup namespace while also binding the host cgroup hierarchy in. The
 // two cancel out: the container would get its own namespace but still read the
