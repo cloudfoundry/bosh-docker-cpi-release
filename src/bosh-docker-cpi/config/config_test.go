@@ -8,7 +8,18 @@ import (
 	. "github.com/onsi/gomega"
 
 	"bosh-docker-cpi/config"
+
+	boshsys "github.com/cloudfoundry/bosh-utils/system"
 )
+
+// stubFileSystem serves one file; the embedded interface satisfies the rest of
+// boshsys.FileSystem, which NewConfigFromPath does not touch.
+type stubFileSystem struct {
+	boshsys.FileSystem
+	contents string
+}
+
+func (s stubFileSystem) ReadFile(string) ([]byte, error) { return []byte(s.contents), nil }
 
 var _ = Describe("Config", func() {
 	Describe("DockerOpts", func() {
@@ -135,6 +146,49 @@ var _ = Describe("Config", func() {
 					},
 				}
 				Expect(cfg.Validate()).To(Succeed())
+			})
+		})
+
+		Describe("NewDefaultConfig", func() {
+			It("defaults use_host_cgroup_namespace to true, as the job spec documents", func() {
+				Expect(config.NewDefaultConfig().UseHostCgroupNamespace).To(BeTrue())
+			})
+
+			It("keeps that default when a loaded config omits the key", func() {
+				fs := stubFileSystem{contents: `{
+					"actions": {
+						"docker": {"host": "unix:///var/run/docker.sock", "api_version": "1.24"},
+						"agent": {"mbus": "https://user:pass@127.0.0.1:4321/agent"}
+					},
+					"start_containers_with_systemd": true,
+					"mount_cgroupfs": true
+				}`}
+
+				cfg, err := config.NewConfigFromPath("/cpi.json", fs)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cfg.UseHostCgroupNamespace).To(BeTrue())
+			})
+
+			It("lets an explicit false in a loaded config win", func() {
+				fs := stubFileSystem{contents: `{
+					"actions": {
+						"docker": {"host": "unix:///var/run/docker.sock", "api_version": "1.24"},
+						"agent": {"mbus": "https://user:pass@127.0.0.1:4321/agent"}
+					},
+					"use_host_cgroup_namespace": false
+				}`}
+
+				cfg, err := config.NewConfigFromPath("/cpi.json", fs)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cfg.UseHostCgroupNamespace).To(BeFalse())
+			})
+
+			It("lets an explicit false in the config win", func() {
+				cfg := config.NewDefaultConfig()
+
+				err := json.Unmarshal([]byte(`{"use_host_cgroup_namespace": false}`), &cfg)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cfg.UseHostCgroupNamespace).To(BeFalse())
 			})
 		})
 

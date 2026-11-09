@@ -84,8 +84,17 @@ func (o FactoryOpts) Validate() error {
 	return nil
 }
 
+// NewDefaultConfig returns a Config carrying the same defaults the job spec
+// documents, for decoding to start from. A config written before a property
+// existed then keeps the documented behaviour rather than the Go zero value,
+// which for a bool is the opposite of a documented default of true. An explicit
+// value in the JSON still wins.
+func NewDefaultConfig() Config {
+	return Config{UseHostCgroupNamespace: true}
+}
+
 func NewConfigFromPath(path string, fs boshsys.FileSystem) (Config, error) {
-	var config Config
+	config := NewDefaultConfig()
 
 	bytes, err := fs.ReadFile(path)
 	if err != nil {
