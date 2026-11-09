@@ -172,16 +172,7 @@ func (f Factory) Create(agentID apiv1.AgentID, stemcell bstem.Stemcell,
 		binds = append(binds, "/sys/fs/cgroup:/sys/fs/cgroup:rw")
 	}
 
-	if lxcfsEnabled {
-		binds = append(binds,
-			// /proc/uptime is excluded on purpose: LXCFS makes it container-relative
-			// while /proc/<pid>/stat's starttime stays host-relative, so uptime minus
-			// starttime goes negative for every process.
-			"/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw",
-			"/var/lib/lxcfs/proc/cpuinfo:/proc/cpuinfo:rw",
-			"/var/lib/lxcfs/proc/stat:/proc/stat:rw",
-		)
-	}
+	binds = append(binds, lxcfsBinds(lxcfsEnabled)...)
 
 	vmProps.HostConfig.Binds = binds //nolint:staticcheck
 
@@ -287,6 +278,26 @@ func populateResolveConf(networks apiv1.Networks) string {
 // the host hierarchy. On cgroup-v1 hosts it must be omitted because the shared
 // host mount causes runc to encounter EBUSY when it tries to rmdir an empty
 // memory cgroup whose kernel accounting charges have not yet propagated.
+// lxcfsBinds returns the LXCFS files to bind over their /proc counterparts, so a
+// container reads values scoped to its own cgroup rather than the host's.
+//
+// /proc/uptime is deliberately absent. LXCFS makes it container-relative, while
+// the starttime field in /proc/<pid>/stat stays host-boot-relative and cannot be
+// virtualized, so uptime - starttime is negative for every process once LXCFS is
+// enabled. That breaks consumers that parse process uptime as an unsigned
+// integer, the BOSH agent's vitals among them.
+func lxcfsBinds(lxcfsEnabled bool) []string {
+	if !lxcfsEnabled {
+		return nil
+	}
+
+	return []string{
+		"/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw",
+		"/var/lib/lxcfs/proc/cpuinfo:/proc/cpuinfo:rw",
+		"/var/lib/lxcfs/proc/stat:/proc/stat:rw",
+	}
+}
+
 // cgroupnsMode returns the cgroup namespace to create the container with, or an
 // empty mode to leave the caller's value alone when systemd is not in use.
 //

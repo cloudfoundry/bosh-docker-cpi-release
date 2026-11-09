@@ -7,6 +7,26 @@ import (
 )
 
 var _ = Describe("Factory", func() {
+	Describe("lxcfsBinds", func() {
+		It("binds nothing when LXCFS is disabled", func() {
+			Expect(lxcfsBinds(false)).To(BeEmpty())
+		})
+
+		It("binds the files capacity detection reads", func() {
+			Expect(lxcfsBinds(true)).To(ConsistOf(
+				"/var/lib/lxcfs/proc/meminfo:/proc/meminfo:rw",
+				"/var/lib/lxcfs/proc/cpuinfo:/proc/cpuinfo:rw",
+				"/var/lib/lxcfs/proc/stat:/proc/stat:rw",
+			))
+		})
+
+		It("never binds /proc/uptime, which would make process uptime negative", func() {
+			for _, bind := range lxcfsBinds(true) {
+				Expect(bind).NotTo(ContainSubstring("uptime"))
+			}
+		})
+	})
+
 	Describe("cgroupnsMode", func() {
 		It("uses the host namespace when asked to", func() {
 			Expect(cgroupnsMode(true, true)).To(Equal(dkrcont.CgroupnsModeHost))
