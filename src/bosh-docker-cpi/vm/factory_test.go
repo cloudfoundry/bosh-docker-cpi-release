@@ -1,11 +1,27 @@
 package vm
 
 import (
+	dkrcont "github.com/docker/docker/api/types/container"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Factory", func() {
+	Describe("cgroupnsMode", func() {
+		It("uses the host namespace when asked to", func() {
+			Expect(cgroupnsMode(true, true)).To(Equal(dkrcont.CgroupnsModeHost))
+		})
+
+		It("names the private namespace explicitly rather than leaving it to the daemon", func() {
+			Expect(cgroupnsMode(true, false)).To(Equal(dkrcont.CgroupnsModePrivate))
+		})
+
+		It("sets no mode at all when systemd is not in use", func() {
+			Expect(cgroupnsMode(false, false)).To(BeEmpty())
+			Expect(cgroupnsMode(false, true)).To(BeEmpty())
+		})
+	})
+
 	Describe("cgroupNamespaceConflict", func() {
 		It("reports a conflict when a private namespace is asked for alongside the host cgroup bind", func() {
 			Expect(cgroupNamespaceConflict(true, true, false)).To(BeTrue())
