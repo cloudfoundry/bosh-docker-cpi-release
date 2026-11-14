@@ -4,7 +4,7 @@ go 1.26.11
 
 require (
 	github.com/cloudfoundry/bosh-cpi-go v0.0.0-20261107100149-ac6688e69f60
-	github.com/cloudfoundry/bosh-utils v0.0.671
+	github.com/cloudfoundry/bosh-utils v0.0.675
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.8.2
@@ -29,7 +29,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/pprof v0.0.0-20261110164715-8bb1ee682bd8 // indirect
+	github.com/google/pprof v0.0.0-20261111200114-fac431ef4d26 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.33.0 // indirect
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.14.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
@@ -40,7 +40,7 @@ require (
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/tidwall/gjson v1.20.2 // indirect
+	github.com/tidwall/gjson v1.20.3 // indirect
 	github.com/tidwall/pretty v1.3.0 // indirect
 	github.com/tidwall/sjson v1.2.9 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
