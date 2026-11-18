@@ -41,8 +41,11 @@ properties:
     description: "Containers will use /sbin/init as the entry point. Enabling this is required for Noble stemcells."
     default: false
   docker_cpi.mount_cgroupfs:
-    description: "Bind-mount the host /sys/fs/cgroup into systemd containers (required for cgroups v2; set false on cgroups v1 hosts to avoid the dying-cgroup runc delete failure). Only takes effect when start_containers_with_systemd is true."
+    description: "Legacy host /sys/fs/cgroup bind for systemd containers. Required for systemd containers on cgroups v2 hosts unless they use docker_cpi.cgroup_v2 (private namespace), in which case it is ignored; it still applies on the cgroup v1 fallback. Set false on cgroup v1 hosts to avoid the dying-cgroup runc delete failure. Only takes effect for systemd containers."
     default: true
+  docker_cpi.cgroup_v2:
+    description: "Prefer a private, writable cgroup v2 namespace for systemd containers on cgroup v2 hosts; fall back to the legacy namespace and mount_cgroupfs setting on cgroup v1 hosts. Applies only to systemd containers; VMs can override it with cloud_properties.cgroup_v2 (true/false). Requires Docker API >= 1.41 for host detection. On v2 requires memory controller delegation, no CgroupnsMode other than private, no VolumesFrom, and no Binds/Mounts/Tmpfs touching /sys/fs/cgroup. Unknown host capabilities and v2 setup failures are errors. See the README."
+    default: false
   docker_cpi.enable_lxcfs_support:
     description: "Enable LXCFS support for containers"
     default: false
