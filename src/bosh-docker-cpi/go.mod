@@ -3,8 +3,8 @@ module bosh-docker-cpi
 go 1.26.11
 
 require (
-	github.com/cloudfoundry/bosh-cpi-go v0.0.0-20261107100149-ac6688e69f60
-	github.com/cloudfoundry/bosh-utils v0.0.675
+	github.com/cloudfoundry/bosh-cpi-go v0.0.0-20261114100113-be5660683e5d
+	github.com/cloudfoundry/bosh-utils v0.0.676
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.8.2
@@ -25,12 +25,13 @@ require (
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
+	github.com/gkampitakis/ciinfo v0.3.5 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/pprof v0.0.0-20261111200114-fac431ef4d26 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.33.0 // indirect
+	github.com/google/pprof v0.0.0-20261118010117-084b33a85f63 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.34.0 // indirect
 	github.com/maxbrunsfeld/counterfeiter/v6 v6.14.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/sys/atomicwriter v0.1.0 // indirect
@@ -40,10 +41,10 @@ require (
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/tidwall/gjson v1.20.3 // indirect
-	github.com/tidwall/pretty v1.3.0 // indirect
-	github.com/tidwall/sjson v1.2.9 // indirect
-	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
+	github.com/sergi/go-diff v1.4.5 // indirect
+	github.com/tidwall/gjson v1.20.5 // indirect
+	github.com/tidwall/sjson v1.2.11 // indirect
+	go.opentelemetry.io/auto/sdk v1.2.2 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.47.0 // indirect
@@ -53,14 +54,14 @@ require (
 	go.opentelemetry.io/proto/otlp v1.11.1 // indirect
 	go.yaml.in/yaml/v3 v3.0.6 // indirect
 	golang.org/x/mod v0.43.0 // indirect
-	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/net v0.63.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
-	golang.org/x/tools v0.52.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20261110000943-09e21b237f2c // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20261110000943-09e21b237f2c // indirect
+	golang.org/x/tools v0.53.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20261118221215-c8830f628b3f // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20261118221215-c8830f628b3f // indirect
 	google.golang.org/grpc v1.85.0 // indirect
 	gotest.tools/v3 v3.5.2 // indirect
 )
